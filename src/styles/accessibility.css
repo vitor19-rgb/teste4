@@ -1,0 +1,639 @@
+/* Accessibility Styles for OrçaMais */
+
+/* Accessibility Button - Fixed Position */
+.accessibility-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 34px;
+  height: 34px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+.accessibility-btn:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.accessibility-btn:focus {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Accessibility Modal */
+.accessibility-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.accessibility-modal.active {
+  display: flex;
+}
+
+.accessibility-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.accessibility-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eaebe5;
+}
+
+.accessibility-modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  flex: 1;
+}
+
+.accessibility-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accessibility-modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.accessibility-modal-close:focus {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.accessibility-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accessibility-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fbf9fa;
+  transition: all 0.2s ease-in-out;
+}
+
+.accessibility-option:hover {
+  background: #f6f6f3;
+  border-color: #d1d5db;
+}
+
+.accessibility-option-label {
+  font-weight: 500;
+  color: #374151;
+  flex: 1;
+}
+
+.accessibility-option-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  min-width: 80px;
+}
+
+.accessibility-option-button:hover {
+  background: #2563eb;
+}
+
+.accessibility-option-button:focus {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.accessibility-option-button.active {
+  background: #059669;
+}
+
+.accessibility-option-button.active:hover {
+  background: #047857;
+}
+
+/* Focus Styles - Global */
+*:focus {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 6px;
+  transition: outline 0.2s ease-in-out;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1002;
+  font-weight: 500;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* High Contrast Mode */
+body.high-contrast {
+  background: #000000 !important;
+  color: #ffff00 !important;
+}
+
+body.high-contrast * {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  border-color: #ffff00 !important;
+}
+
+body.high-contrast .bg-white,
+body.high-contrast .bg-gray-50,
+body.high-contrast .bg-blue-50,
+body.high-contrast .bg-green-50,
+body.high-contrast .bg-red-50,
+body.high-contrast .bg-purple-50,
+body.high-contrast .bg-slate-50,
+body.high-contrast .bg-indigo-50,
+body.high-contrast .bg-emerald-50 {
+  background-color: #000000 !important;
+}
+
+body.high-contrast .text-gray-600,
+body.high-contrast .text-gray-700,
+body.high-contrast .text-gray-800,
+body.high-contrast .text-blue-600,
+body.high-contrast .text-green-600,
+body.high-contrast .text-red-600,
+body.high-contrast .text-slate-600,
+body.high-contrast .text-slate-700,
+body.high-contrast .text-slate-800 {
+  color: #ffff00 !important;
+}
+
+body.high-contrast button,
+body.high-contrast input,
+body.high-contrast select {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  border: 2px solid #ffff00 !important;
+}
+
+body.high-contrast button:hover,
+body.high-contrast button:focus {
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+}
+
+/* Dark Mode - CORES EXATAS DO ARQUIVO DE REFERÊNCIA */
+body.dark-mode {
+  background: #0f172a !important;
+  color: #f9f1f7 !important;
+}
+
+/* Backgrounds escuros sólidos */
+body.dark-mode .bg-white {
+  background-color: #1e293b !important;
+}
+
+body.dark-mode .bg-gray-50,
+body.dark-mode .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+body.dark-mode .bg-blue-50 {
+  background-color: #1e3a8a !important;
+}
+
+body.dark-mode .bg-green-50,
+body.dark-mode .bg-emerald-50 {
+  background-color: #064e3b !important;
+}
+
+body.dark-mode .bg-red-50 {
+  background-color: #7f1d1d !important;
+}
+
+body.dark-mode .bg-indigo-50 {
+  background-color: #312e81 !important;
+}
+
+body.dark-mode .bg-gradient-to-br {
+  background: #1e293b !important;
+}
+
+/* CORREÇÃO ESPECÍFICA PARA TEXTOS COM GRADIENTE NO MODO ESCURO */
+body.dark-mode .text-white {
+  color: #ffffff !important;
+}
+
+/* Remove gradientes e bordas azuis no modo escuro */
+body.dark-mode .bg-gradient-to-r,
+body.dark-mode .bg-clip-text,
+body.dark-mode .text-transparent {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  text-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Correção específica para o título "OrçaMais" */
+body.dark-mode h1 .bg-gradient-to-r,
+body.dark-mode h1 .bg-clip-text,
+body.dark-mode h1 .text-transparent,
+body.dark-mode .bg-gradient-to-r.from-blue-400.to-cyan-400,
+body.dark-mode .bg-gradient-to-r.from-slate-800.to-blue-600 {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #1666b6 !important;
+  text-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Textos com cores sólidas e bem visíveis */
+body.dark-mode .text-gray-600,
+body.dark-mode .text-gray-700,
+body.dark-mode .text-gray-800,
+body.dark-mode .text-slate-600,
+body.dark-mode .text-slate-700,
+body.dark-mode .text-slate-800 {
+  color: #1666b6 !important;
+}
+
+/* Cores específicas do arquivo de referência */
+body.dark-mode .text-blue-600,
+body.dark-mode .text-blue-700,
+body.dark-mode .text-blue-800,
+body.dark-mode .text-blue-900 {
+  color: #60a5fa !important;
+}
+
+body.dark-mode .text-green-600,
+body.dark-mode .text-emerald-600,
+body.dark-mode .text-emerald-700,
+body.dark-mode .text-emerald-800,
+body.dark-mode .text-emerald-900,
+body.dark-mode .text-green-700,
+body.dark-mode .text-green-800,
+body.dark-mode .text-green-900 {
+  color: #059669 !important;
+}
+
+body.dark-mode .text-red-600,
+body.dark-mode .text-red-700,
+body.dark-mode .text-red-800,
+body.dark-mode .text-red-900 {
+  color: #dc2626 !important;
+}
+
+body.dark-mode .text-indigo-600,
+body.dark-mode .text-indigo-700,
+body.dark-mode .text-indigo-800,
+body.dark-mode .text-indigo-900 {
+  color: #d817e6 !important;
+}
+
+body.dark-mode .text-purple-600,
+body.dark-mode .text-purple-700,
+body.dark-mode .text-purple-800 {
+  color: #000000 !important;
+}
+
+body.dark-mode .text-yellow-600,
+body.dark-mode .text-yellow-700,
+body.dark-mode .text-yellow-800 {
+  color: #000000 !important;
+}
+
+body.dark-mode .text-pink-600,
+body.dark-mode .text-pink-700,
+body.dark-mode .text-pink-800 {
+  color: #000000 !important;
+}
+
+body.dark-mode .text-cyan-600,
+body.dark-mode .text-cyan-700,
+body.dark-mode .text-cyan-800 {
+  color: #000000 !important;
+}
+
+/* Textos específicos do OrçaMais */
+body.dark-mode .text-blue-100,
+body.dark-mode .text-blue-200 {
+  color: #feecdb !important;
+}
+
+body.dark-mode .text-emerald-100,
+body.dark-mode .text-green-100 {
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .text-red-100,
+body.dark-mode .text-red-200,
+body.dark-mode .text-red-300 {
+  color: #fff !important;
+}
+
+/* Inputs e selects */
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #374151 !important;
+  color: #15a870 !important;
+  border-color: #4b5563 !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode select::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #15a870 !important;
+}
+
+/* Sombras adaptadas */
+body.dark-mode .shadow-xl,
+body.dark-mode .shadow-2xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7) !important;
+}
+
+body.dark-mode .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Bordas */
+body.dark-mode .border-blue-100,
+body.dark-mode .border-slate-200,
+body.dark-mode .border-emerald-200,
+body.dark-mode .border-red-200,
+body.dark-mode .border-indigo-200,
+body.dark-mode .border-gray-200,
+body.dark-mode .border-gray-300 {
+  border-color: #60634b !important;
+}
+
+/* Botões específicos */
+body.dark-mode .bg-gradient-to-r {
+  background: linear-gradient(to right, #1e40af, #3730a3) !important;
+}
+
+body.dark-mode .bg-gradient-to-br {
+  background: #1e293b !important;
+}
+
+/* Modal de acessibilidade no modo escuro */
+body.dark-mode .accessibility-modal-content {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .accessibility-modal-title {
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .accessibility-modal-close {
+  color: #ffffff !important;
+}
+
+body.dark-mode .accessibility-modal-close:hover {
+  background-color: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+body.dark-mode .accessibility-option {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+}
+
+body.dark-mode .accessibility-option:hover {
+  background-color: #333333 !important;
+  border-color: #505050 !important;
+}
+
+body.dark-mode .accessibility-option-label {
+  color: #fff !important;
+}
+
+/* Large Font Mode */
+body.large-font {
+  font-size: 1.0em;
+}
+
+body.large-font h1 {
+  font-size: 2.5em;
+}
+
+body.large-font h2 {
+  font-size: 2em;
+}
+
+body.large-font h3 {
+  font-size: 1.5em;
+}
+
+body.large-font .text-sm {
+  font-size: 1em;
+}
+
+body.large-font .text-xs {
+  font-size: 0.875em;
+}
+
+/* Toast Notifications - Accessible */
+.toast {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: #059669;
+  color: #f1f5f9;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+
+.toast.error {
+  background: #dc2626;
+}
+
+.toast.warning {
+  background: #d97706;
+}
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* CORREÇÕES ESPECÍFICAS PARA MOBILE - RESPONSIVIDADE */
+@media (max-width: 768px) {
+  /* Botão de acessibilidade - posicionamento melhorado no mobile */
+  .accessibility-btn {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    z-index: 1050; /* Z-index mais alto para ficar acima de tudo */
+  }
+  
+  /* Toast notifications - ajuste para mobile */
+  .toast {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+    margin: 0 auto;
+  }
+  
+  /* Ensure minimum touch target size on mobile */
+  button,
+  input,
+  select,
+  .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Modal de acessibilidade - ajuste para mobile */
+  .accessibility-modal {
+    padding: 15px;
+  }
+  
+  .accessibility-modal-content {
+    padding: 20px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  
+  /* Alertas - espaçamento melhorado no mobile */
+  .alert-container {
+    margin-top: 60px; /* Espaço para o botão de acessibilidade */
+  }
+}
+
+/* Ajustes específicos para telas muito pequenas */
+@media (max-width: 480px) {
+  .accessibility-btn {
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .toast {
+    top: 55px;
+    right: 8px;
+    left: 8px;
+    padding: 12px 16px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Focus trap for modals */
+.modal-open {
+  overflow: hidden;
+}
+
+/* Improved button focus for better visibility */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  border-radius: 6px !important;
+  transition: outline 0.2s ease-in-out !important;
+}
+
+/* Ensure focus is visible in high contrast mode */
+body.high-contrast *:focus {
+  outline: 3px solid #ffff00 !important;
+  outline-offset: 2px !important;
+}
+
+/* Ensure focus is visible in dark mode */
+body.dark-mode *:focus {
+  outline: 3px solid #60a5fa !important;
+  outline-offset: 2px !important;
+}
+
+/* Remove bordas azuis específicas no modo escuro */
+body.dark-mode *:focus:not(input):not(select):not(textarea):not(button) {
+  outline: none !important;
+}
