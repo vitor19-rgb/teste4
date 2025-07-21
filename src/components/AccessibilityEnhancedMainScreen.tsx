@@ -974,6 +974,9 @@ const getAnnualIncome = () => {
 </div>
 
           </div>
+          <br/>
+    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
+          <br />
 
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
