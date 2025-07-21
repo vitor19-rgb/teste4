@@ -983,18 +983,15 @@ const getAnnualIncome = () => {
   </div>
 </div>
 
-<<<<<<< HEAD
+
           </div>   
              <br/>
     <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
           <br />
-=======
-          </div>
-          <br/>
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
-          <br />
 
->>>>>>> b3fa99b659a7a508becc21b25b0e86cb8e1d2648
+         
+
+
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
