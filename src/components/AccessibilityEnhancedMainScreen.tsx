@@ -17,6 +17,17 @@ interface MainScreenProps {
 }
 
 export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onNavigate }) => {
+  // Detecta se o modo large-font está ativo no body
+  const [isLargeFont, setIsLargeFont] = React.useState(false);
+  React.useEffect(() => {
+    const checkLargeFont = () => {
+      setIsLargeFont(document.body.classList.contains('large-font'));
+    };
+    checkLargeFont();
+    const observer = new MutationObserver(checkLargeFont);
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
 
   // ▼▼▼ COLE ESTE NOVO BLOCO CORRIGIDO NO LUGAR DO ANTIGO ▼▼▼
@@ -573,7 +584,7 @@ const getAnnualIncome = () => {
 
 {/* MOBILE: Card com tamanho fixo - AJUSTADO FIEL AO PRINT */}
 <div
-  className="block sm:hidden bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border border-blue-200 shadow-[0_4px_24px_0_rgba(37,99,235,0.10)] px-6 pt-5 pb-4 relative mx-auto flex flex-col gap-0"
+  className="block sm:hidden bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border border-blue-200 shadow-[0_4px_24px_0_rgba(37,99,235,0.10)] px-6 pt-5 pb-4 relative mx-auto flex flex-col gap-0 renda-mensal-mobile-card"
   style={{
     width: '342.4px',
     minWidth: '342.4px',
@@ -582,8 +593,7 @@ const getAnnualIncome = () => {
     marginLeft: '-15px',
     overflow: 'hidden',
     wordBreak: 'break-word',
-    ...(window.matchMedia && window.matchMedia('(max-width: 640px) and (min-width: 320px) and (forced-colors: none)').matches
-      ? { fontSize: 'max(16px, 1em)' } : {}),
+    fontSize: '16px',
   }}
   tabIndex={0}
   aria-label="Card Minha Renda Mensal"
@@ -973,8 +983,10 @@ const getAnnualIncome = () => {
   </div>
 </div>
 
-          </div>
-
+          </div>   
+             <br/>
+    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
+          <br />
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

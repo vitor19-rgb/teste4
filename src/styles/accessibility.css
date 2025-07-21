@@ -1,3 +1,18 @@
+/* Desativa fonte grande no card mobile Minha Renda Mensal */
+body.large-font .renda-mensal-mobile-card,
+body.large-font .renda-mensal-mobile-card *,
+body.large-font .renda-mensal-mobile-card > *,
+body.large-font .renda-mensal-mobile-card .text-xs,
+body.large-font .renda-mensal-mobile-card .text-sm,
+body.large-font .renda-mensal-mobile-card .text-base,
+body.large-font .renda-mensal-mobile-card .text-lg,
+body.large-font .renda-mensal-mobile-card .text-xl,
+body.large-font .renda-mensal-mobile-card .text-2xl,
+body.large-font .renda-mensal-mobile-card .text-3xl,
+body.large-font .renda-mensal-mobile-card .text-4xl {
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+}
 /* Accessibility Styles for OrçaMais */
 
 /* Accessibility Button - Fixed Position */
