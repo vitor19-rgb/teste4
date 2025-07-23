@@ -333,6 +333,22 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
       return;
     }
 
+    // Obter nome do usuário do localStorage ou fallback
+    let userName = '';
+    if (window && window.localStorage && window.localStorage.getItem('userName')) {
+      userName = window.localStorage.getItem('userName') || '';
+    }
+    if (!userName) {
+      // @ts-ignore
+      userName = (window.navigator && window.navigator.userName) || '';
+    }
+    if (!userName) {
+      userName = 'usuário';
+    }
+
+    // Saudação personalizada
+    const saudacao = `Olá, ${userName}! Seu relatório detalhado do mês ${formatPeriod(data.period)} está pronto.`;
+
     const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
     const rows = data.transactions.map((t: any) => [
       t.date,
@@ -342,7 +358,8 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
       t.amount.toFixed(2).replace('.', ',')
     ]);
 
-    const csvContent = [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
+    // Adiciona a saudação como primeira linha, depois o cabeçalho e os dados
+    const csvContent = [saudacao, headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
 
     // Adicionar BOM para UTF-8
     const BOM = '\uFEFF';
@@ -359,28 +376,50 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
       const jsPDF = (await import('jspdf')).default;
       const html2canvas = (await import('html2canvas')).default;
 
+      // Obter nome do usuário do navegador ou de um campo, fallback para 'usuário'
+      let userName = '';
+      if (window && window.localStorage && window.localStorage.getItem('userName')) {
+        userName = window.localStorage.getItem('userName') || '';
+      }
+      if (!userName) {
+        // Tenta pegar do sistema operacional (apenas navegadores que suportam)
+        // @ts-ignore
+        userName = (window.navigator && window.navigator.userName) || '';
+      }
+      if (!userName) {
+        userName = 'usuário';
+      }
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
+
+      // Saudação personalizada
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Olá, ${userName}!`, 20, 18);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Seu relatório detalhado do mês ${formatPeriod(data.period)} está pronto.`, 20, 26);
+
       // Título
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('OrçaMais - Relatório Financeiro', pageWidth / 2, 20, { align: 'center' });
-      
+      pdf.text('OrçaMais - Relatório Financeiro', pageWidth / 2, 38, { align: 'center' });
+
       // Período
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Período: ${formatPeriod(data.period)}`, pageWidth / 2, 30, { align: 'center' });
-      
-      let yPosition = 45;
-      
+      pdf.text(`Período: ${formatPeriod(data.period)}`, pageWidth / 2, 48, { align: 'center' });
+
+      let yPosition = 63;
+
       // Resumo Financeiro
       pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Resumo Financeiro', 20, yPosition);
       yPosition += 10;
-      
+
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
       pdf.text(`Renda Mensal: ${formatCurrency(data.summary.monthlyIncome)}`, 20, yPosition);
@@ -391,14 +430,14 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
       yPosition += 7;
       pdf.text(`Saldo: ${formatCurrency(data.summary.balance)}`, 20, yPosition);
       yPosition += 15;
-      
+
       // Transações
       if (data.transactions && data.transactions.length > 0) {
         pdf.setFontSize(16);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Transações', 20, yPosition);
         yPosition += 10;
-        
+
         // Cabeçalho da tabela
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'bold');
@@ -408,11 +447,11 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
         pdf.text('Tipo', 140, yPosition);
         pdf.text('Valor', 170, yPosition);
         yPosition += 5;
-        
+
         // Linha separadora
         pdf.line(20, yPosition, pageWidth - 20, yPosition);
         yPosition += 5;
-        
+
         // Dados das transações
         pdf.setFont('helvetica', 'normal');
         data.transactions.slice(0, 30).forEach((t: any) => {
@@ -420,7 +459,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
             pdf.addPage();
             yPosition = 20;
           }
-          
+
           pdf.text(t.date, 20, yPosition);
           pdf.text(t.description.substring(0, 25), 40, yPosition);
           pdf.text(t.category, 100, yPosition);
@@ -428,20 +467,20 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
           pdf.text(formatCurrency(t.amount), 170, yPosition);
           yPosition += 5;
         });
-        
+
         if (data.transactions.length > 30) {
           yPosition += 5;
           pdf.setFont('helvetica', 'italic');
           pdf.text(`... e mais ${data.transactions.length - 30} transações`, 20, yPosition);
         }
       }
-      
+
       // Rodapé
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
       pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 
                 pageWidth / 2, pageHeight - 10, { align: 'center' });
-      
+
       pdf.save(`orcamais-${data.period}.pdf`);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
@@ -464,10 +503,10 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
               <span className="hidden sm:inline">Relatório Detalhado</span>
               <span className="sm:hidden">Relatório</span>
             </h1>
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
-              <button
+               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end sm:justify-end">
+                  <button
                 onClick={() => setShowBudgetModal(true)}
-                className="flex items-center bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform text-sm min-w-0 flex-shrink-0"
+                className="flex items-center bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform text-sm min-w-0 flex-shrink-0"
               >
                 <svg className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -476,14 +515,18 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
                 <span className="sm:hidden">Orçamentos</span>
               </button>
 
+              
+           
+
               <button
                 onClick={() => setShowExportModal(true)}
-                className="flex items-center bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform text-sm min-w-0 flex-shrink-0"
+                className="flex items-center bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform text-sm min-w-0 flex-shrink-0"
               >
                 <svg className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
                 <span className="hidden sm:inline">Exportar</span>
+                <span className="sm:hidden" style={{fontSize: '12.5px'}} >Exportar</span>
               </button>
 
               <button
