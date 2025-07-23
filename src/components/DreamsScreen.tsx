@@ -195,7 +195,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
               <span className="hidden sm:inline">Simulador de Sonhos</span>
               <span className="sm:hidden">Meus Sonhos</span>
             </h1>
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end sm:justify-end">
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center bg-gradient-to-r from-purple-600 to-pink-700 hover:from-purple-700 hover:to-pink-800 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform text-sm min-w-0 flex-shrink-0"
@@ -204,7 +204,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 <span className="hidden sm:inline">Novo Sonho</span>
-                <span className="sm:hidden">Novo</span>
+                <span className="sm:hidden" >Novo Sonho</span>
               </button>
 
               <button
