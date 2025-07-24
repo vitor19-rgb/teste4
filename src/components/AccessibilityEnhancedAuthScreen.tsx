@@ -201,7 +201,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                       placeholder="Digite seu nome completo"
-                      maxLength={20}
+                      maxLength={50}
                       aria-invalid={errors.name ? 'true' : 'false'}
                       aria-describedby={errors.name ? 'name-error' : undefined}
                       autoComplete="name"
@@ -239,7 +239,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                     placeholder="Digite seu email"
-                    maxLength={20}
+                    maxLength={70}
                     required
                     aria-invalid={errors.email ? 'true' : 'false'}
                     aria-describedby={errors.email ? 'email-error' : undefined}
@@ -276,7 +276,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                     placeholder="Digite sua senha"
-                    maxLength={20}
+                    maxLength={50}
                     required
                     aria-invalid={errors.password ? 'true' : 'false'}
                     aria-describedby={errors.password ? 'password-error password-help' : 'password-help'}
