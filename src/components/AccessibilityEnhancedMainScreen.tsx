@@ -1077,60 +1077,67 @@ const getAnnualIncome = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {summary.transactions.map((transaction: any) => (
-                  <div
-                    key={transaction.id}
-                    className={`flex items-center justify-between p-4 rounded-xl border ${
-                      transaction.type === 'income' 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-red-50 border-red-200'
-                    }`}
-                  >
-                    <div className="flex items-center flex-1 min-w-0">
-                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
-                        transaction.type === 'income' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-red-600 text-white'
-                      }`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          {transaction.type === 'income' 
-                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                          }
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-800 truncate">{transaction.description}</p>
-                        <div className="flex items-center text-sm text-gray-600 mt-1">
-                          <span>{transaction.date}</span>
-                          <span className="mx-2">•</span>
-                          <span className={`px-2 py-1 rounded-full text-xs ${getCategoryColor(transaction.category)} truncate`}>
-                            {transaction.category}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                         {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO E CORRIGIDO ▼▼▼ */}
+{summary.transactions.map((transaction: any) => (
+  <div
+    key={transaction.id}
+    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border ${
+      transaction.type === 'income' 
+        ? 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-800' 
+        : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800'
+    }`}
+  >
+    {/* Parte Esquerda: Ícone e Textos */}
+    <div className="flex items-center flex-1 min-w-0 w-full">
+      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
+        transaction.type === 'income' 
+          ? 'bg-green-600 text-white' 
+          : 'bg-red-600 text-white'
+      }`}>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {transaction.type === 'income' 
+            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+          }
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
+        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <span>{transaction.date}</span>
+          <span className="mx-2">•</span>
+      <span
+  className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800/50 dark:!text-blue-300"
+  style={{ color: '#1666B6' }}
+>
+  {transaction.category}
+</span>
+        </div>
+      </div>
+    </div>
 
-                    <div className="flex items-center ml-2 flex-shrink-0">
-                      <span className={`text-lg font-bold mr-4 ${
-                        transaction.type === 'income' ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {transaction.type === 'income' 
-                          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
-                          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
-                      </span>
-                      <button
-                        onClick={() => deleteTransaction(transaction.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors p-2 hover:bg-red-50 rounded-lg"
-                        title="Excluir transação"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+    {/* Parte Direita: Valor e Botão de Excluir */}
+    {/* 👇 MUDANÇA AQUI: de 'justify-between' para 'justify-start' e adicionado 'gap-4' */}
+    <div className="flex items-center justify-end sm:justify-end gap-4 w-full sm:w-auto mt-3 sm:mt-0">
+      <span className={`text-lg font-bold ${
+        transaction.type === 'income' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+      }`}>
+        {transaction.type === 'income' 
+          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
+          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
+      </span>
+      <button
+        onClick={() => deleteTransaction(transaction.id)}
+        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg"
+        title="Excluir transação"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+))}
               </div>
             )}
           </div>
