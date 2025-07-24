@@ -912,31 +912,16 @@ const getAnnualIncome = () => {
           {/* DESKTOP: mantém grid original */}
           <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {/* Card Receitas Extras */}
-           <div
-  // 👇 AS CLASSES DE COR AGORA ESTÃO AQUI E FUNCIONAM! 👇
-  className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full md:w-auto"
-  style={{
-    width: '100%',
-    maxWidth: '357.33px',
-    height: 'auto',
-    minHeight: '110px',
-    // A LINHA 'background' FOI REMOVIDA DAQUI
-    padding: '0',
-    marginBottom: '16px',
-  }}
->
-  <div className="flex flex-col items-center justify-center w-full h-full py-3">
-    <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-      </svg>
-    </div>
-    {/* 👇 E AS CORES DO TEXTO TAMBÉM FORAM CORRIGIDAS AQUI 👇 */}
-    <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
-    <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
+          {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE, AGORA COM O MESMO PADRÃO DO CARD "GASTOS" ▼▼▼ */}
+<div className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center p-3">
+  <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
+    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+    </svg>
   </div>
+  <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
+  <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
 </div>
-
             {/* Card Gastos */}
  {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO BLOCO CORRIGIDO ▼▼▼ */}
 {/* Card Gastos Totais */}
