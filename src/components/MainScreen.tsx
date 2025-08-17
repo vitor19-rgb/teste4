@@ -21,12 +21,14 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNavigate }) => {
   });
   const [showSpendingAlert, setShowSpendingAlert] = useState(false);
 
-  const user = dataManager.getCurrentUser();
+ 
   const categories = dataManager.getCategories();
 
   useEffect(() => {
-    updateSummary();
-  }, [currentPeriod]);
+    if (user) { // Adicionamos esta verificação
+      updateSummary();
+    }
+  }, [currentPeriod, user]); // Adicionamos 'user' aqui
 
   const updateSummary = () => {
     const newSummary = dataManager.getFinancialSummary(currentPeriod);
@@ -107,7 +109,8 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNavigate }) => {
     return (summary.totalExpenses / summary.monthlyIncome) * 100;
   };
 
-  if (!summary) return <div>Carregando...</div>;
+// SUBSTITUA PELA LINHA ABAIXO:
+  if (!user || !summary) return <div className="text-center p-10">Carregando...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4">
