@@ -17,6 +17,11 @@ interface MainScreenProps {
 }
 
 export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onNavigate }) => {
+  // ▼▼▼ ADICIONE ESTE BLOCO INTEIRO ▼▼▼
+ 
+
+  
+  // ▲▲▲ FIM DO BLOCO A SER ADICIONADO ▲▲▲
   // Detecta se o modo large-font está ativo no body
   const [isLargeFont, setIsLargeFont] = React.useState(false);
   React.useEffect(() => {
@@ -28,26 +33,36 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+  // ▼▼▼ ADICIONE ESTE BLOCO CORRIGIDO AQUI ▼▼▼
+  const [user, setUser] = useState(dataManager.getCurrentUser());
 
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUser(dataManager.getCurrentUser());
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    if (dataManager.isInitialized && !user) {
+        handleAuthChange();
+    }
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
+  // ▲▲▲ FIM DO BLOCO PARA ADICIONAR ▲▲▲
 
   // ▼▼▼ COLE ESTE NOVO BLOCO CORRIGIDO NO LUGAR DO ANTIGO ▼▼▼
-useEffect(() => {
-  const handleThemeChange = () => {
-    const newTheme = dataManager.getCurrentUser?.()?.settings?.theme || 'light';
-    dataManager.setUserTheme(newTheme); // Chama o método do DataManager para aplicar o tema
-  };
+  useEffect(() => {
+    const handleThemeChange = () => {
+      const newTheme = dataManager.getCurrentUser?.()?.settings?.theme || 'light';
+      dataManager.setUserTheme(newTheme);
+    };
+    handleThemeChange();
+    window.addEventListener('themeChanged', handleThemeChange);
+    return () => {
+      window.removeEventListener('themeChanged', handleThemeChange);
+    };
+  }, []);
 
-  // Aplica o tema na montagem do componente
-  handleThemeChange();
+  // ✨ NOVO: Adiciona um estado para o usuário, que força o componente a re-renderizar
 
-  // Adiciona o listener para o evento customizado
-  window.addEventListener('themeChanged', handleThemeChange);
-
-  // Função de limpeza: remove o listener quando o componente "morre"
-  return () => {
-    window.removeEventListener('themeChanged', handleThemeChange);
-  };
-}, []); // Removida a dependência do estado 'theme' local
 
   const [currentPeriod, setCurrentPeriod] = useState(getCurrentPeriod());
   const [summary, setSummary] = useState<any>(null);
@@ -62,18 +77,38 @@ useEffect(() => {
   const [showSpendingAlert, setShowSpendingAlert] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
-  const user = dataManager.getCurrentUser();
+  // ✨ NOVO: Este useEffect "ouve" o sinal do DataManager e atualiza o estado 'user'
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUser(dataManager.getCurrentUser());
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    if (dataManager.isInitialized && !user) {
+        handleAuthChange();
+    }
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
+
+  // Salva o nome do usuário no localStorage para uso em outros componentes (ex: exportar PDF)
+  React.useEffect(() => {
+    if (user?.profile?.name) {
+      window.localStorage.setItem('userName', user.profile.name);
+    }
+  }, [user?.profile?.name]); // 🔄 MODIFICADO: A linha "const user = ..." foi removida de cima
+
   const categories = dataManager.getCategories();
 
+  // 🔄 MODIFICADO: Este useEffect agora espera pelo 'user' antes de rodar
   useEffect(() => {
-    updateSummary();
-  }, [currentPeriod]);
+    if (user) {
+      updateSummary();
+    }
+  }, [currentPeriod, user]); // A dependência 'user' foi adicionada
 
   const updateSummary = () => {
     const newSummary = dataManager.getFinancialSummary(currentPeriod);
     setSummary(newSummary);
     
-    // Verificar se os gastos atingiram 90% da renda
     if (newSummary && newSummary.monthlyIncome > 0) {
       const spendingPercentage = (newSummary.totalExpenses / newSummary.monthlyIncome) * 100;
       setShowSpendingAlert(spendingPercentage >= 90);
@@ -455,7 +490,7 @@ const getAnnualIncome = () => {
     }
   };
 
-  if (!summary) return <div>Carregando...</div>;
+  if (!user || !summary) return <div className="text-center p-10">Carregando...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
@@ -912,29 +947,15 @@ const getAnnualIncome = () => {
           {/* DESKTOP: mantém grid original */}
           <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {/* Card Receitas Extras */}
-           <div
-  // 👇 AS CLASSES DE COR AGORA ESTÃO AQUI E FUNCIONAM! 👇
-  className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full md:w-auto"
-  style={{
-    width: '100%',
-    maxWidth: '357.33px',
-    height: 'auto',
-    minHeight: '110px',
-    // A LINHA 'background' FOI REMOVIDA DAQUI
-    padding: '0',
-    marginBottom: '16px',
-  }}
->
-  <div className="flex flex-col items-center justify-center w-full h-full py-3">
-    <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-      </svg>
-    </div>
-    {/* 👇 E AS CORES DO TEXTO TAMBÉM FORAM CORRIGIDAS AQUI 👇 */}
-    <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
-    <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
+        {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE, AGORA COM O MESMO PADRÃO DO CARD "GASTOS" ▼▼▼ */}
+<div className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center p-3">
+  <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
+    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+    </svg>
   </div>
+  <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
+  <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
 </div>
 
             {/* Card Gastos */}
@@ -983,18 +1004,15 @@ const getAnnualIncome = () => {
   </div>
 </div>
 
-<<<<<<< HEAD
+
           </div>   
              <br/>
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
-          <br />
-=======
-          </div>
-          <br/>
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Histórico de Transações</h5> 
+    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
           <br />
 
->>>>>>> b3fa99b659a7a508becc21b25b0e86cb8e1d2648
+         
+
+
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1095,60 +1113,67 @@ const getAnnualIncome = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {summary.transactions.map((transaction: any) => (
-                  <div
-                    key={transaction.id}
-                    className={`flex items-center justify-between p-4 rounded-xl border ${
-                      transaction.type === 'income' 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-red-50 border-red-200'
-                    }`}
-                  >
-                    <div className="flex items-center flex-1 min-w-0">
-                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
-                        transaction.type === 'income' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-red-600 text-white'
-                      }`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          {transaction.type === 'income' 
-                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                          }
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-800 truncate">{transaction.description}</p>
-                        <div className="flex items-center text-sm text-gray-600 mt-1">
-                          <span>{transaction.date}</span>
-                          <span className="mx-2">•</span>
-                          <span className={`px-2 py-1 rounded-full text-xs ${getCategoryColor(transaction.category)} truncate`}>
-                            {transaction.category}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO E CORRIGIDO ▼▼▼ */}
+{summary.transactions.map((transaction: any) => (
+  <div
+    key={transaction.id}
+    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border ${
+      transaction.type === 'income' 
+        ? 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-800' 
+        : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800'
+    }`}
+  >
+    {/* Parte Esquerda: Ícone e Textos */}
+    <div className="flex items-center flex-1 min-w-0 w-full">
+      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
+        transaction.type === 'income' 
+          ? 'bg-green-600 text-white' 
+          : 'bg-red-600 text-white'
+      }`}>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {transaction.type === 'income' 
+            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+          }
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
+        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <span>{transaction.date}</span>
+          <span className="mx-2">•</span>
+      <span
+  className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800/50 dark:!text-blue-300"
+  style={{ color: '#1666B6' }}
+>
+  {transaction.category}
+</span>
+        </div>
+      </div>
+    </div>
 
-                    <div className="flex items-center ml-2 flex-shrink-0">
-                      <span className={`text-lg font-bold mr-4 ${
-                        transaction.type === 'income' ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {transaction.type === 'income' 
-                          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
-                          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
-                      </span>
-                      <button
-                        onClick={() => deleteTransaction(transaction.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors p-2 hover:bg-red-50 rounded-lg"
-                        title="Excluir transação"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+    {/* Parte Direita: Valor e Botão de Excluir */}
+    {/* 👇 MUDANÇA AQUI: de 'justify-between' para 'justify-start' e adicionado 'gap-4' */}
+    <div className="flex items-center justify-end sm:justify-end gap-4 w-full sm:w-auto mt-3 sm:mt-0">
+      <span className={`text-lg font-bold ${
+        transaction.type === 'income' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+      }`}>
+        {transaction.type === 'income' 
+          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
+          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
+      </span>
+  <button
+  onClick={() => deleteTransaction(transaction.id)}
+ className="text-red-500 dark:text-red-400 transition-colors p-2 rounded-lg border-none"
+  title="Excluir transação"
+>
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+  </svg>
+</button>
+    </div>
+  </div>
+))}
               </div>
             )}
           </div>
@@ -1269,4 +1294,3 @@ const getAnnualIncome = () => {
     </div>
   );
 };
-

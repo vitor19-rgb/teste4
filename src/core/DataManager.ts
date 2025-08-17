@@ -1,9 +1,29 @@
 /**
  * DataManager - Gerenciador centralizado de dados do OrçaMais
- * Responsável por toda persistência no localStorage e gerenciamento de estado
- * VERSÃO ESTENDIDA COM NOVAS FUNCIONALIDADES
+ * Responsável por toda a persistência de dados no Firebase (Firestore)
+ * e gerenciamento de estado da aplicação.
+ * VERSÃO COMPLETA E CORRIGIDA PARA FIREBASE
  */
 
+// 1. IMPORTAÇÕES DO FIREBASE E TIPOS
+import {
+  Auth,
+  User,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import {
+  Firestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { auth, db } from "../core/firebaseConfig"; // <-- VERIFIQUE SE ESTE CAMINHO ESTÁ CORRETO
+
+// As interfaces permanecem exatamente as mesmas.
 interface UserProfile {
   name: string;
   email: string;
@@ -21,7 +41,6 @@ interface Transaction {
   createdAt: string;
 }
 
-// NOVA INTERFACE: Orçamento por Categoria
 interface CategoryBudget {
   category: string;
   limit: number;
@@ -30,7 +49,6 @@ interface CategoryBudget {
   status: 'ok' | 'warning' | 'exceeded';
 }
 
-// NOVA INTERFACE: Sonhos/Metas
 interface Dream {
   id: string;
   name: string;
@@ -42,7 +60,6 @@ interface Dream {
   createdAt: string;
 }
 
-// NOVA INTERFACE: Alertas
 interface Alert {
   id: string;
   type: 'budget' | 'dream' | 'general';
@@ -61,8 +78,7 @@ interface UserData {
     transactions: Transaction[];
     categories: string[];
     goals: any[];
-    // NOVAS PROPRIEDADES
-    categoryBudgets: Record<string, number>; // { "Alimentação": 500, "Transporte": 300 }
+    categoryBudgets: Record<string, number>;
     dreams: Dream[];
     alerts: Alert[];
   };
@@ -73,37 +89,14 @@ interface UserData {
   };
 }
 
-interface AppData {
-  users: Record<string, UserData>;
-  currentUserId: string | null;
-  version: string;
-}
 
 class DataManager {
-  /**
-   * Altera o tema do usuário e dispara evento para atualizar o modo escuro
-   */
-  setUserTheme(theme: 'light' | 'dark') {
-    if (!this.currentUser) return false;
-    this.currentUser.settings.theme = theme;
-    this.saveData();
-    // Aplica imediatamente a classe no <html>
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-    }
-    window.dispatchEvent(new Event('themeChanged'));
-    return true;
-  }
-  private STORAGE_KEY = 'orcamais:data';
+  private auth: Auth;
+  private db: Firestore;
   private currentUser: UserData | null = null;
-  private data: AppData;
+  public isInitialized: boolean = false;
 
-  // MAPEAMENTO MELHORADO: Palavras-chave para categorias (mais abrangente)
+  // MAPEAMENTO COMPLETO DE PALAVRAS-CHAVE (MANTIDO DO ORIGINAL)
   private categoryKeywords: Record<string, string[]> = {
     'Alimentação': [
       'supermercado', 'padaria', 'restaurante', 'lanchonete', 'mercado', 'feira', 'açougue', 
@@ -162,312 +155,263 @@ class DataManager {
     ]
   };
 
+  // =================================================================
+  // SETUP E AUTENTICAÇÃO
+  // =================================================================
+
   constructor() {
-    this.data = this.loadData();
-    if (this.data.currentUserId && this.data.users[this.data.currentUserId]) {
-      this.currentUser = this.data.users[this.data.currentUserId];
-      this.migrateUserData(); // Migrar dados para nova estrutura
-    }
-  }
-
-  /**
-   * Migra dados do usuário para nova estrutura (compatibilidade)
-   */
-  private migrateUserData(): void {
-    if (!this.currentUser) return;
-
-    // Adicionar propriedades se não existirem
-    if (!this.currentUser.financial.categoryBudgets) {
-      this.currentUser.financial.categoryBudgets = {};
-    }
-    if (!this.currentUser.financial.dreams) {
-      this.currentUser.financial.dreams = [];
-    }
-    if (!this.currentUser.financial.alerts) {
-      this.currentUser.financial.alerts = [];
-    }
-
-    this.saveData();
-  }
-
-  /**
-   * FUNCIONALIDADE MELHORADA: Sugestão automática de categoria
-   * Agora com algoritmo mais inteligente e palavras-chave expandidas
-   */
-  suggestCategory(description: string): string {
-    if (!description || description.length < 2) return 'Outros';
-    
-    const descLower = description.toLowerCase().trim();
-    
-    // Remover acentos para melhor matching
-    const removeAccents = (str: string) => {
-      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    };
-    
-    const descNormalized = removeAccents(descLower);
-    
-    // Pontuação para cada categoria baseada na relevância das palavras encontradas
-    const categoryScores: Record<string, number> = {};
-    
-    for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
-      let score = 0;
-      
-      for (const keyword of keywords) {
-        const keywordNormalized = removeAccents(keyword.toLowerCase());
-        
-        // Pontuação maior para match exato
-        if (descNormalized === keywordNormalized) {
-          score += 10;
-        }
-        // Pontuação alta para palavra completa
-        else if (descNormalized.includes(` ${keywordNormalized} `) || 
-                 descNormalized.startsWith(`${keywordNormalized} `) ||
-                 descNormalized.endsWith(` ${keywordNormalized}`) ||
-                 descNormalized === keywordNormalized) {
-          score += 5;
-        }
-        // Pontuação média para substring
-        else if (descNormalized.includes(keywordNormalized)) {
-          score += 2;
-        }
-        // Pontuação baixa para palavras similares (distância de edição)
-        else if (this.calculateSimilarity(descNormalized, keywordNormalized) > 0.8) {
-          score += 1;
-        }
+    this.auth = auth;
+    this.db = db;
+    onAuthStateChanged(this.auth, async (user) => {
+      if (user) {
+        await this._loadUserData(user);
+        this._applyUserTheme();
+      } else {
+        this.currentUser = null;
       }
-      
-      if (score > 0) {
-        categoryScores[category] = score;
-      }
-    }
-    
-    // Retornar a categoria com maior pontuação
-    if (Object.keys(categoryScores).length > 0) {
-      const bestCategory = Object.keys(categoryScores).reduce((a, b) => 
-        categoryScores[a] > categoryScores[b] ? a : b
-      );
-      
-      // Só sugerir se a pontuação for significativa
-      if (categoryScores[bestCategory] >= 2) {
-        return bestCategory;
-      }
-    }
-    
-    return 'Outros';
+      this.isInitialized = true;
+      window.dispatchEvent(new CustomEvent('authChange', { detail: { user: this.currentUser } }));
+    });
   }
 
-  /**
-   * Calcula similaridade entre duas strings (algoritmo de Jaro-Winkler simplificado)
-   */
-  private calculateSimilarity(str1: string, str2: string): number {
-    if (str1 === str2) return 1;
-    
-    const len1 = str1.length;
-    const len2 = str2.length;
-    
-    if (len1 === 0 || len2 === 0) return 0;
-    
-    const matchWindow = Math.floor(Math.max(len1, len2) / 2) - 1;
-    if (matchWindow < 0) return 0;
-    
-    const str1Matches = new Array(len1).fill(false);
-    const str2Matches = new Array(len2).fill(false);
-    
-    let matches = 0;
-    let transpositions = 0;
-    
-    // Identificar matches
-    for (let i = 0; i < len1; i++) {
-      const start = Math.max(0, i - matchWindow);
-      const end = Math.min(i + matchWindow + 1, len2);
-      
-      for (let j = start; j < end; j++) {
-        if (str2Matches[j] || str1[i] !== str2[j]) continue;
-        str1Matches[i] = true;
-        str2Matches[j] = true;
-        matches++;
-        break;
-      }
-    }
-    
-    if (matches === 0) return 0;
-    
-    // Calcular transposições
-    let k = 0;
-    for (let i = 0; i < len1; i++) {
-      if (!str1Matches[i]) continue;
-      while (!str2Matches[k]) k++;
-      if (str1[i] !== str2[k]) transpositions++;
-      k++;
-    }
-    
-    const jaro = (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3;
-    
-    return jaro;
-  }
+  private async _loadUserData(firebaseUser: User) {
+    const userDocRef = doc(this.db, "users", firebaseUser.uid);
+    const docSnap = await getDoc(userDocRef);
 
-  /**
-   * NOVA FUNCIONALIDADE: Gerenciar orçamentos por categoria
-   */
-  setCategoryBudget(category: string, limit: number): boolean {
-    if (!this.currentUser) return false;
-    
-    this.currentUser.financial.categoryBudgets[category] = limit;
-    this.updateBudgetAlerts();
-    return this.saveData();
-  }
-
-  getCategoryBudgets(): CategoryBudget[] {
-    if (!this.currentUser) return [];
-
-    const currentPeriod = this.getCurrentPeriod();
-    const transactions = this.getTransactionsByPeriod(currentPeriod);
-    const budgets: CategoryBudget[] = [];
-
-    for (const [category, limit] of Object.entries(this.currentUser.financial.categoryBudgets)) {
-      const spent = transactions
-        .filter(t => t.type === 'expense' && t.category === category)
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      const percentage = limit > 0 ? (spent / limit) * 100 : 0;
-      let status: 'ok' | 'warning' | 'exceeded' = 'ok';
-      
-      if (percentage >= 100) status = 'exceeded';
-      else if (percentage >= 80) status = 'warning';
-
-      budgets.push({
-        category,
-        limit,
-        spent,
-        percentage,
-        status
+    if (docSnap.exists()) {
+      this.currentUser = docSnap.data() as UserData;
+      await this._migrateUserDataIfNeeded();
+    } else {
+      this.currentUser = this._createUserStructure(firebaseUser.uid, {
+        name: firebaseUser.displayName || 'Novo Usuário',
+        email: firebaseUser.email!,
       });
+      await setDoc(userDocRef, this.currentUser);
     }
-
-    return budgets;
   }
 
-  /**
-   * NOVA FUNCIONALIDADE: Gerenciar sonhos/metas
-   */
-  addDream(dreamData: Omit<Dream, 'id' | 'createdAt' | 'savedAmount'>): Dream | false {
-    if (!this.currentUser) return false;
+  async registerUser(userData: any): Promise<{ success: boolean; user?: UserData; message?: string }> {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(this.auth, userData.email, userData.password);
+      const newUser = this._createUserStructure(userCredential.user.uid, userData);
+      await setDoc(doc(this.db, 'users', userCredential.user.uid), newUser);
+      this.currentUser = newUser;
+      return { success: true, user: this.currentUser };
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  }
 
+  async loginUser(email: string, password: string): Promise<{ success: boolean; user?: UserData; message?: string }> {
+    try {
+      await signInWithEmailAndPassword(this.auth, email, password);
+      // onAuthStateChanged cuidará de carregar os dados.
+      return { success: true, user: this.currentUser! };
+    } catch (error: any) {
+      return { success: false, message: 'Usuário ou senha inválidos.' };
+    }
+  }
+
+  async logout(): Promise<void> {
+    await signOut(this.auth);
+  }
+
+  isLoggedIn(): boolean {
+    return !!this.auth.currentUser;
+  }
+
+  getCurrentUser(): UserData | null {
+    return this.currentUser;
+  }
+  
+  // =================================================================
+  // MÉTODOS DE ESCRITA (WRITE) - ADAPTADOS PARA SEREM ASSÍNCRONOS
+  // =================================================================
+
+  private async _saveData(): Promise<boolean> {
+    if (!this.currentUser) return false;
+    try {
+      await setDoc(doc(this.db, "users", this.currentUser.id), this.currentUser);
+      return true;
+    } catch (error) {
+      console.error("Erro ao salvar dados no Firestore:", error);
+      return false;
+    }
+  }
+
+  async setUserTheme(theme: 'light' | 'dark'): Promise<boolean> {
+    if (!this.currentUser) return false;
+    this.currentUser.settings.theme = theme;
+    this._applyUserTheme(); // Aplica visualmente
+    // Usa updateDoc para eficiência
+    try {
+        await updateDoc(doc(this.db, "users", this.currentUser.id), { 'settings.theme': theme });
+        return true;
+    } catch (error) {
+        console.error("Erro ao salvar tema:", error);
+        return false;
+    }
+  }
+
+  async setMonthlyIncome(yearMonth: string, amount: number): Promise<boolean> {
+    if (!this.currentUser) return false;
+    this.currentUser.financial.monthlyIncomes[yearMonth] = parseFloat(amount.toString()) || 0;
+    // Usa updateDoc para eficiência
+    try {
+        await updateDoc(doc(this.db, "users", this.currentUser.id), { 
+            [`financial.monthlyIncomes.${yearMonth}`]: this.currentUser.financial.monthlyIncomes[yearMonth] 
+        });
+        return true;
+    } catch(error) {
+        console.error("Erro ao definir renda mensal:", error);
+        return false;
+    }
+  }
+
+  async addTransaction(transactionData: any): Promise<Transaction | false> {
+    if (!this.currentUser) return false;
+    const transaction: Transaction = {
+      id: this._generateId(),
+      ...transactionData,
+      amount: parseFloat(transactionData.amount),
+      date: transactionData.date || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString()
+    };
+    this.currentUser.financial.transactions.unshift(transaction);
+    this._updateBudgetAlerts(); // Atualiza alertas com base na nova transação
+    return (await this._saveData()) ? transaction : false;
+  }
+
+  async removeTransaction(transactionId: string): Promise<boolean> {
+    if (!this.currentUser) return false;
+    const index = this.currentUser.financial.transactions.findIndex(t => t.id === transactionId);
+    if (index === -1) return false;
+    this.currentUser.financial.transactions.splice(index, 1);
+    this._updateBudgetAlerts();
+    return await this._saveData();
+  }
+
+  async setCategoryBudget(category: string, limit: number): Promise<boolean> {
+    if (!this.currentUser) return false;
+    this.currentUser.financial.categoryBudgets[category] = limit;
+    this._updateBudgetAlerts();
+    return await this._saveData();
+  }
+
+  async addDream(dreamData: Omit<Dream, 'id' | 'createdAt' | 'savedAmount'>): Promise<Dream | false> {
+    if (!this.currentUser) return false;
     const dream: Dream = {
-      id: this.generateId(),
+      id: this._generateId(),
       ...dreamData,
       savedAmount: 0,
       createdAt: new Date().toISOString()
     };
-
     this.currentUser.financial.dreams.push(dream);
-    return this.saveData() ? dream : false;
+    return (await this._saveData()) ? dream : false;
   }
 
-  updateDreamSavings(dreamId: string, savedAmount: number): boolean {
+  async updateDreamSavings(dreamId: string, savedAmount: number): Promise<boolean> {
     if (!this.currentUser) return false;
-
     const dream = this.currentUser.financial.dreams.find(d => d.id === dreamId);
     if (!dream) return false;
-
     dream.savedAmount = savedAmount;
-    return this.saveData();
+    return await this._saveData();
+  }
+
+  async removeDream(dreamId: string): Promise<boolean> {
+    if (!this.currentUser) return false;
+    const index = this.currentUser.financial.dreams.findIndex(d => d.id === dreamId);
+    if (index === -1) return false;
+    this.currentUser.financial.dreams.splice(index, 1);
+    return await this._saveData();
+  }
+
+  async dismissAlert(alertId: string): Promise<boolean> {
+    if (!this.currentUser) return false;
+    const alert = this.currentUser.financial.alerts.find(a => a.id === alertId);
+    if (!alert) return false;
+    alert.dismissed = true;
+    return await this._saveData();
+  }
+
+  async addCategory(categoryName: string): Promise<boolean> {
+    if (!this.currentUser || !categoryName.trim()) return false;
+    const categories = this.currentUser.financial.categories;
+    if (!categories.includes(categoryName)) {
+      categories.push(categoryName);
+      return await this._saveData();
+    }
+    return false; // Categoria já existia
+  }
+
+  // =================================================================
+  // MÉTODOS DE LEITURA (READ) E LÓGICA DE NEGÓCIO - SEM ALTERAÇÃO
+  // =================================================================
+
+  suggestCategory(description: string): string {
+    if (!description || description.length < 2) return 'Outros';
+    const descLower = description.toLowerCase().trim();
+    const removeAccents = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const descNormalized = removeAccents(descLower);
+    const categoryScores: Record<string, number> = {};
+    for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
+      let score = 0;
+      for (const keyword of keywords) {
+        const keywordNormalized = removeAccents(keyword.toLowerCase());
+        if (descNormalized === keywordNormalized) score += 10;
+        else if (descNormalized.includes(` ${keywordNormalized} `) || descNormalized.startsWith(`${keywordNormalized} `) || descNormalized.endsWith(` ${keywordNormalized}`)) score += 5;
+        else if (descNormalized.includes(keywordNormalized)) score += 2;
+        else if (this._calculateSimilarity(descNormalized, keywordNormalized) > 0.8) score += 1;
+      }
+      if (score > 0) categoryScores[category] = score;
+    }
+    if (Object.keys(categoryScores).length > 0) {
+      const bestCategory = Object.keys(categoryScores).reduce((a, b) => categoryScores[a] > categoryScores[b] ? a : b);
+      if (categoryScores[bestCategory] >= 2) return bestCategory;
+    }
+    return 'Outros';
+  }
+
+  getCategoryBudgets(): CategoryBudget[] {
+    if (!this.currentUser) return [];
+    const currentPeriod = this._getCurrentPeriod();
+    const transactions = this.getTransactionsByPeriod(currentPeriod);
+    const budgets: CategoryBudget[] = [];
+    for (const [category, limit] of Object.entries(this.currentUser.financial.categoryBudgets)) {
+      const spent = transactions.filter(t => t.type === 'expense' && t.category === category).reduce((sum, t) => sum + t.amount, 0);
+      const percentage = limit > 0 ? (spent / limit) * 100 : 0;
+      let status: 'ok' | 'warning' | 'exceeded' = 'ok';
+      if (percentage >= 100) status = 'exceeded';
+      else if (percentage >= 80) status = 'warning';
+      budgets.push({ category, limit, spent, percentage, status });
+    }
+    return budgets;
   }
 
   getDreams(): Dream[] {
-    if (!this.currentUser) return [];
-    return [...this.currentUser.financial.dreams];
-  }
-
-  removeDream(dreamId: string): boolean {
-    if (!this.currentUser) return false;
-
-    const index = this.currentUser.financial.dreams.findIndex(d => d.id === dreamId);
-    if (index === -1) return false;
-
-    this.currentUser.financial.dreams.splice(index, 1);
-    return this.saveData();
-  }
-
-  /**
-   * NOVA FUNCIONALIDADE: Sistema de alertas
-   */
-  private updateBudgetAlerts(): void {
-    if (!this.currentUser) return;
-
-    // Limpar alertas antigos de orçamento
-    this.currentUser.financial.alerts = this.currentUser.financial.alerts.filter(
-      alert => alert.type !== 'budget'
-    );
-
-    const budgets = this.getCategoryBudgets();
-    
-    budgets.forEach(budget => {
-      if (budget.status === 'warning' || budget.status === 'exceeded') {
-        const alert: Alert = {
-          id: this.generateId(),
-          type: 'budget',
-          category: budget.category,
-          message: budget.status === 'exceeded' 
-            ? `Orçamento de ${budget.category} excedido! Gasto: R$ ${budget.spent.toFixed(2)} / Limite: R$ ${budget.limit.toFixed(2)}`
-            : `Atenção: ${budget.percentage.toFixed(0)}% do orçamento de ${budget.category} utilizado`,
-          severity: budget.status === 'exceeded' ? 'error' : 'warning',
-          createdAt: new Date().toISOString(),
-          dismissed: false
-        };
-
-        this.currentUser.financial.alerts.push(alert);
-      }
-    });
-
-    this.saveData();
+    return this.currentUser ? [...this.currentUser.financial.dreams] : [];
   }
 
   getActiveAlerts(): Alert[] {
-    if (!this.currentUser) return [];
-    return this.currentUser.financial.alerts.filter(alert => !alert.dismissed);
+    return this.currentUser ? this.currentUser.financial.alerts.filter(alert => !alert.dismissed) : [];
   }
 
-  dismissAlert(alertId: string): boolean {
-    if (!this.currentUser) return false;
-
-    const alert = this.currentUser.financial.alerts.find(a => a.id === alertId);
-    if (!alert) return false;
-
-    alert.dismissed = true;
-    return this.saveData();
-  }
-
-  /**
-   * NOVA FUNCIONALIDADE: Dados para gráficos
-   */
   getExpensesByCategory(yearMonth: string): Record<string, number> {
     const transactions = this.getTransactionsByPeriod(yearMonth);
     const expenses: Record<string, number> = {};
-
-    transactions
-      .filter(t => t.type === 'expense')
-      .forEach(t => {
-        expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-      });
-
+    transactions.filter(t => t.type === 'expense').forEach(t => {
+      expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+    });
     return expenses;
   }
 
-  getMonthlyComparison(months: number = 6): Array<{
-    period: string;
-    income: number;
-    expenses: number;
-    balance: number;
-  }> {
+  getMonthlyComparison(months: number = 6): Array<{ period: string; income: number; expenses: number; balance: number; }> {
     const data = [];
     const currentDate = new Date();
-
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
       const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const summary = this.getFinancialSummary(period);
-
       if (summary) {
         data.push({
           period,
@@ -477,22 +421,12 @@ class DataManager {
         });
       }
     }
-
     return data;
   }
 
-  /**
-   * NOVA FUNCIONALIDADE: Exportar dados
-   */
   getExportData(type: 'current' | 'all' = 'current', period?: string): any {
     if (!this.currentUser) return null;
-
-    const exportData: any = {
-      user: this.currentUser.profile,
-      exportDate: new Date().toISOString(),
-      type
-    };
-
+    const exportData: any = { user: this.currentUser.profile, exportDate: new Date().toISOString(), type };
     if (type === 'current' && period) {
       const summary = this.getFinancialSummary(period);
       exportData.period = period;
@@ -504,368 +438,175 @@ class DataManager {
       exportData.categoryBudgets = this.currentUser.financial.categoryBudgets;
       exportData.dreams = this.currentUser.financial.dreams;
     }
-
     return exportData;
   }
 
-  // Métodos auxiliares existentes mantidos...
-  private getCurrentPeriod(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  }
-
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }
-
-  /**
-   * Carrega dados do localStorage
-   */
-  private loadData(): AppData {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {
-        users: {},
-        currentUserId: null,
-        version: '2.0.0'
-      };
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      return { users: {}, currentUserId: null, version: '2.0.0' };
-    }
-  }
-
-  /**
-   * Salva dados no localStorage
-   */
-  private saveData(): boolean {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
-      return true;
-    } catch (error) {
-      console.error('Erro ao salvar dados:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Cria estrutura padrão para novo usuário
-   */
-  private createUserStructure(userId: string, userData: any): UserData {
-    return {
-      id: userId,
-      profile: {
-        name: userData.name,
-        email: userData.email,
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
-      },
-      financial: {
-        monthlyIncomes: {},
-        transactions: [],
-        categories: [
-          'Alimentação', 'Transporte', 'Moradia', 'Saúde', 
-          'Educação', 'Lazer', 'Compras', 'Outros'
-        ],
-        goals: [],
-        // NOVAS PROPRIEDADES
-        categoryBudgets: {},
-        dreams: [],
-        alerts: []
-      },
-      settings: {
-        currency: 'BRL',
-        theme: 'light',
-        notifications: true
-      }
-    };
-  }
-
-  /**
-   * Registra novo usuário
-   */
-  registerUser(userData: any): { success: boolean; user?: UserData; message?: string } {
-    const userId = this.generateUserId(userData.email);
-    
-    if (this.data.users[userId]) {
-      return { success: false, message: 'Usuário já existe' };
-    }
-
-    this.data.users[userId] = this.createUserStructure(userId, userData);
-    this.data.currentUserId = userId;
-    this.currentUser = this.data.users[userId];
-    
-    if (this.saveData()) {
-      return { success: true, user: this.currentUser };
-    }
-    
-    return { success: false, message: 'Erro ao salvar dados' };
-  }
-
-  /**
-   * Autentica usuário
-   */
-  loginUser(email: string, password: string): { success: boolean; user?: UserData; message?: string } {
-    const userId = this.generateUserId(email);
-    const user = this.data.users[userId];
-
-    if (!user) {
-      return { success: false, message: 'Usuário não encontrado' };
-    }
-
-    user.profile.lastLogin = new Date().toISOString();
-    this.data.currentUserId = userId;
-    this.currentUser = user;
-    this.migrateUserData(); // Migrar dados se necessário
-    
-    this.saveData();
-    return { success: true, user: this.currentUser };
-  }
-
-  /**
-   * Logout do usuário atual
-   */
-  logout(): void {
-    this.currentUser = null;
-    this.data.currentUserId = null;
-    this.saveData();
-  }
-
-  /**
-   * Gera ID único baseado no email
-   */
-  private generateUserId(email: string): string {
-    return btoa(email.toLowerCase()).replace(/[^a-zA-Z0-9]/g, '');
-  }
-
-  /**
-   * Gera ID único para transação
-   */
-  private generateTransactionId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }
-
-  /**
-   * Obtém renda mensal para período específico
-   */
   getMonthlyIncome(yearMonth: string): number {
     if (!this.currentUser) return 0;
     return this.currentUser.financial.monthlyIncomes[yearMonth] || 0;
   }
 
-  /**
-   * ✅ MÉTODO CORRIGIDO: Define renda mensal para período específico
-   * Esta é a implementação principal solicitada na tarefa
-   */
-  setMonthlyIncome(yearMonth: string, amount: number): boolean {
-    if (!this.currentUser) return false;
-    
-    // Garantir que monthlyIncomes existe
-    if (!this.currentUser.financial.monthlyIncomes) {
-      this.currentUser.financial.monthlyIncomes = {};
-    }
-    
-    this.currentUser.financial.monthlyIncomes[yearMonth] = parseFloat(amount.toString()) || 0;
-    return this.saveData();
-  }
-
-  /**
-   * Adiciona nova transação
-   */
-  addTransaction(transactionData: any): Transaction | false {
-    if (!this.currentUser) return false;
-
-    const transaction: Transaction = {
-      id: this.generateTransactionId(),
-      description: transactionData.description,
-      amount: parseFloat(transactionData.amount),
-      type: transactionData.type,
-      category: transactionData.category || 'Outros',
-      date: transactionData.date || new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    };
-
-    this.currentUser.financial.transactions.unshift(transaction);
-    
-    // Atualizar alertas de orçamento após nova transação
-    this.updateBudgetAlerts();
-    
-    return this.saveData() ? transaction : false;
-  }
-
-  /**
-   * Remove transação
-   */
-  removeTransaction(transactionId: string): boolean {
-    if (!this.currentUser) return false;
-
-    const index = this.currentUser.financial.transactions.findIndex(t => t.id === transactionId);
-    if (index === -1) return false;
-
-    this.currentUser.financial.transactions.splice(index, 1);
-    
-    // Atualizar alertas de orçamento após remoção
-    this.updateBudgetAlerts();
-    
-    return this.saveData();
-  }
-
-  /**
-   * Obtém transações filtradas por período
-   */
   getTransactionsByPeriod(yearMonth: string): Transaction[] {
     if (!this.currentUser) return [];
-    
     const targetPeriod = yearMonth.trim();
-    
-    const filteredTransactions = this.currentUser.financial.transactions.filter(transaction => {
-      const transactionPeriod = transaction.date.substring(0, 7);
-      return transactionPeriod === targetPeriod;
-    });
-    
-    return filteredTransactions;
+    return this.currentUser.financial.transactions.filter(transaction => transaction.date.substring(0, 7) === targetPeriod);
   }
 
-  /**
-   * Obtém todas as transações do usuário atual
-   */
   getAllTransactions(): Transaction[] {
-    if (!this.currentUser) return [];
-    return [...this.currentUser.financial.transactions];
+    return this.currentUser ? [...this.currentUser.financial.transactions] : [];
   }
 
-  /**
-   * Calcula resumo financeiro para período específico
-   */
   getFinancialSummary(yearMonth: string): any {
     if (!this.currentUser) return null;
-
     const transactions = this.getTransactionsByPeriod(yearMonth);
     const monthlyIncome = this.getMonthlyIncome(yearMonth);
-
-    const periodIncome = transactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    const periodIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalIncome = monthlyIncome + periodIncome;
-
-    const totalExpenses = transactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = totalIncome - totalExpenses;
-
     const expensesByCategory: Record<string, number> = {};
-    transactions
-      .filter(t => t.type === 'expense')
-      .forEach(t => {
-        expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
-      });
-
-    const summary = {
-      period: yearMonth,
-      monthlyIncome,
-      totalIncome,
-      totalExpenses,
-      balance,
-      transactionCount: transactions.length,
-      expensesByCategory,
+    transactions.filter(t => t.type === 'expense').forEach(t => {
+      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
+    });
+    return {
+      period: yearMonth, monthlyIncome, totalIncome, totalExpenses, balance,
+      transactionCount: transactions.length, expensesByCategory,
       transactions: transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     };
-
-    return summary;
   }
 
-  /**
-   * Compara dois períodos financeiros
-   */
   comparePeriods(period1: string, period2: string): any {
     const summary1 = this.getFinancialSummary(period1);
     const summary2 = this.getFinancialSummary(period2);
-
     if (!summary1 || !summary2) return null;
-
     return {
-      period1: summary1,
-      period2: summary2,
+      period1: summary1, period2: summary2,
       comparison: {
         incomeChange: summary2.totalIncome - summary1.totalIncome,
         expenseChange: summary2.totalExpenses - summary1.totalExpenses,
         balanceChange: summary2.balance - summary1.balance,
-        incomeChangePercent: summary1.totalIncome > 0 ? 
-          ((summary2.totalIncome - summary1.totalIncome) / summary1.totalIncome) * 100 : 0,
-        expenseChangePercent: summary1.totalExpenses > 0 ? 
-          ((summary2.totalExpenses - summary1.totalExpenses) / summary1.totalExpenses) * 100 : 0
+        incomeChangePercent: summary1.totalIncome > 0 ? ((summary2.totalIncome - summary1.totalIncome) / summary1.totalIncome) * 100 : 0,
+        expenseChangePercent: summary1.totalExpenses > 0 ? ((summary2.totalExpenses - summary1.totalExpenses) / summary1.totalExpenses) * 100 : 0
       }
     };
   }
-
-  /**
-   * Obtém usuário atual
-   */
-  getCurrentUser(): UserData | null {
-    return this.currentUser;
-  }
-
-  /**
-   * Verifica se usuário está logado
-   */
-  isLoggedIn(): boolean {
-    return this.currentUser !== null;
-  }
-
-  /**
-   * Obtém categorias do usuário
-   */
+  
   getCategories(): string[] {
-    if (!this.currentUser) return [];
-    return this.currentUser.financial.categories;
+    return this.currentUser ? this.currentUser.financial.categories : [];
   }
 
-  /**
-   * Adiciona nova categoria
-   */
-  addCategory(categoryName: string): boolean {
-    if (!this.currentUser || !categoryName.trim()) return false;
-    
-    const categories = this.currentUser.financial.categories;
-    if (!categories.includes(categoryName)) {
-      categories.push(categoryName);
-      return this.saveData();
-    }
-    return false;
-  }
-
-  /**
-   * Método para debug - listar todas as transações com suas datas
-   */
   debugTransactions(): void {
-    if (!this.currentUser) {
-      console.log('Nenhum usuário logado');
-      return;
-    }
-
+    if (!this.currentUser) { console.log('Nenhum usuário logado'); return; }
     console.log('=== DEBUG TRANSAÇÕES ===');
     console.log('Total de transações:', this.currentUser.financial.transactions.length);
-    
     this.currentUser.financial.transactions.forEach((t, index) => {
       console.log(`${index + 1}. ${t.description} - ${t.date} - R$ ${t.amount} (${t.type})`);
     });
-
     console.log('=== RENDAS MENSAIS ===');
     Object.entries(this.currentUser.financial.monthlyIncomes).forEach(([period, income]) => {
       console.log(`${period}: R$ ${income}`);
     });
   }
-}
 
-// Instância singleton
+  // =================================================================
+  // MÉTODOS AUXILIARES (PRIVADOS)
+  // =================================================================
+
+  private async _migrateUserDataIfNeeded(): Promise<void> {
+    if (!this.currentUser) return;
+    let needsUpdate = false;
+    if (!this.currentUser.financial.categoryBudgets) { this.currentUser.financial.categoryBudgets = {}; needsUpdate = true; }
+    if (!this.currentUser.financial.dreams) { this.currentUser.financial.dreams = []; needsUpdate = true; }
+    if (!this.currentUser.financial.alerts) { this.currentUser.financial.alerts = []; needsUpdate = true; }
+    if (needsUpdate) await this._saveData();
+  }
+  
+  private _calculateSimilarity(str1: string, str2: string): number {
+    if (str1 === str2) return 1;
+    const len1 = str1.length; const len2 = str2.length;
+    if (len1 === 0 || len2 === 0) return 0;
+    const matchWindow = Math.floor(Math.max(len1, len2) / 2) - 1;
+    if (matchWindow < 0) return 0;
+    const str1Matches = new Array(len1).fill(false);
+    const str2Matches = new Array(len2).fill(false);
+    let matches = 0; let transpositions = 0;
+    for (let i = 0; i < len1; i++) {
+      const start = Math.max(0, i - matchWindow);
+      const end = Math.min(i + matchWindow + 1, len2);
+      for (let j = start; j < end; j++) {
+        if (str2Matches[j] || str1[i] !== str2[j]) continue;
+        str1Matches[i] = true; str2Matches[j] = true; matches++; break;
+      }
+    }
+    if (matches === 0) return 0;
+    let k = 0;
+    for (let i = 0; i < len1; i++) {
+      if (!str1Matches[i]) continue;
+      while (!str2Matches[k]) k++;
+      if (str1[i] !== str2[k]) transpositions++;
+      k++;
+    }
+    const jaro = (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3;
+    return jaro;
+  }
+
+  private _updateBudgetAlerts(): void {
+    if (!this.currentUser) return;
+    this.currentUser.financial.alerts = this.currentUser.financial.alerts.filter(alert => alert.type !== 'budget');
+    const budgets = this.getCategoryBudgets();
+    budgets.forEach(budget => {
+      if (budget.status === 'warning' || budget.status === 'exceeded') {
+        const alert: Alert = {
+          id: this._generateId(), type: 'budget', category: budget.category,
+          message: budget.status === 'exceeded' 
+            ? `Orçamento de ${budget.category} excedido! Gasto: R$ ${budget.spent.toFixed(2)} / Limite: R$ ${budget.limit.toFixed(2)}`
+            : `Atenção: ${budget.percentage.toFixed(0)}% do orçamento de ${budget.category} utilizado`,
+          severity: budget.status === 'exceeded' ? 'error' : 'warning',
+          createdAt: new Date().toISOString(), dismissed: false
+        };
+        this.currentUser!.financial.alerts.push(alert);
+      }
+    });
+    // A chamada para _saveData() será feita pelo método público que invocou este.
+  }
+
+  private _getCurrentPeriod(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private _generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  private _createUserStructure(userId: string, userData: any): UserData {
+    return {
+      id: userId,
+      profile: { name: userData.name, email: userData.email, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() },
+      financial: {
+        monthlyIncomes: {}, transactions: [],
+        categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Outros'],
+        goals: [], categoryBudgets: {}, dreams: [], alerts: []
+      },
+      settings: { currency: 'BRL', theme: 'light', notifications: true }
+    };
+  }
+
+ private _applyUserTheme(): void {
+  if (!this.currentUser) return;
+  const theme = this.currentUser.settings.theme;
+  const root = document.documentElement;
+  if (theme === 'dark') {
+    root.classList.add('dark');
+    root.setAttribute('data-theme', 'dark');
+  } else {
+    root.classList.remove('dark');
+    root.setAttribute('data-theme', 'light');
+  }
+  // A linha que dispara o evento foi REMOVIDA.
+}}
+
+// Instância singleton e exportação
 const dataManager = new DataManager();
-
-
-
-export default dataManager;
-// Expondo dataManager globalmente para facilitar a depuração no console
 (window as any).dataManager = dataManager;
+export default dataManager;

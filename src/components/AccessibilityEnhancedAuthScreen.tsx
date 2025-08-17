@@ -1,6 +1,7 @@
 /**
  * Accessibility Enhanced AuthScreen
  * Design profissional corporativo com WCAG 2.1 compliance
+ * VERSÃO CORRIGIDA COM ASYNC/AWAIT
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -51,7 +52,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
     }, 1000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { // <-- ADICIONADO ASYNC
     e.preventDefault();
     clearErrors();
 
@@ -91,36 +92,28 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
     }
 
     if (isLoginMode) {
-      handleLogin();
+      await handleLogin(); // <-- ADICIONADO AWAIT
     } else {
-      handleRegister();
+      await handleRegister(); // <-- ADICIONADO AWAIT
     }
   };
 
-  const handleLogin = () => {
-    const result = dataManager.loginUser(formData.email, formData.password);
+  // ▼▼▼ FUNÇÃO CORRIGIDA ▼▼▼
+  const handleLogin = async () => { // <-- ADICIONADO ASYNC
+    const result = await dataManager.loginUser(formData.email, formData.password); // <-- ADICIONADO AWAIT
     
     if (result.success) {
       announceError('Login realizado com sucesso');
       onAuthSuccess(result.user);
     } else {
-      const registerResult = dataManager.registerUser({
-        name: formData.email.split('@')[0],
-        email: formData.email
-      });
-      
-      if (registerResult.success) {
-        announceError('Conta criada e login realizado com sucesso');
-        onAuthSuccess(registerResult.user);
-      } else {
-        setErrors({ ...errors, email: 'Erro ao fazer login' });
-        announceError('Erro ao fazer login');
-      }
+        setErrors({ ...errors, email: result.message || 'Usuário ou senha inválidos' });
+        announceError(`Erro ao fazer login: ${result.message || 'Usuário ou senha inválidos'}`);
     }
   };
 
-  const handleRegister = () => {
-    const result = dataManager.registerUser({
+  // ▼▼▼ FUNÇÃO CORRIGIDA ▼▼▼
+  const handleRegister = async () => { // <-- ADICIONADO ASYNC
+    const result = await dataManager.registerUser({ // <-- ADICIONADO AWAIT
       name: formData.name,
       email: formData.email,
       password: formData.password
@@ -142,6 +135,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
   };
 
   return (
+    // ... O RESTO DO SEU CÓDIGO JSX PERMANECE O MESMO ...
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
@@ -201,7 +195,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                       placeholder="Digite seu nome completo"
-                      maxLength={20}
+                      maxLength={50}
                       aria-invalid={errors.name ? 'true' : 'false'}
                       aria-describedby={errors.name ? 'name-error' : undefined}
                       autoComplete="name"
@@ -239,7 +233,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                     placeholder="Digite seu email"
-                    maxLength={20}
+                    maxLength={70}
                     required
                     aria-invalid={errors.email ? 'true' : 'false'}
                     aria-describedby={errors.email ? 'email-error' : undefined}
@@ -276,7 +270,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
                     placeholder="Digite sua senha"
-                    maxLength={20}
+                    maxLength={50}
                     required
                     aria-invalid={errors.password ? 'true' : 'false'}
                     aria-describedby={errors.password ? 'password-error password-help' : 'password-help'}
