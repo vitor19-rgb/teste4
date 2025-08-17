@@ -1005,10 +1005,15 @@ const getAnnualIncome = () => {
 </div>
 
 
+
           </div>   
              <br/>
     <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
+    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
           <br />
+
+         
+
 
          
 
