@@ -1,69 +1,14 @@
-/**
- * AccessibilityEnhancedMainScreen - Tela principal com acessibilidade aprimorada
- * Design profissional corporativo com WCAG 2.1 compliance
- * VERSÃO FINAL: 100% fiel ao site de referência com responsividade corrigida
- * Site de referência: https://lucky-marshmallow-7494f6.netlify.app/
- * Foco exclusivo na seção de "Renda Mensal" conforme solicitado
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import dataManager from '../core/DataManager';
 import { formatCurrency, getCurrentPeriod, formatPeriod, getPreviousPeriod, getNextPeriod } from '../utils/formatters';
-import { Bold, Weight } from 'lucide-react';
 
 interface MainScreenProps {
   onNavigate: (screen: string) => void;
 }
 
 export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onNavigate }) => {
-  // ▼▼▼ ADICIONE ESTE BLOCO INTEIRO ▼▼▼
- 
-
-  
-  // ▲▲▲ FIM DO BLOCO A SER ADICIONADO ▲▲▲
-  // Detecta se o modo large-font está ativo no body
-  const [isLargeFont, setIsLargeFont] = React.useState(false);
-  React.useEffect(() => {
-    const checkLargeFont = () => {
-      setIsLargeFont(document.body.classList.contains('large-font'));
-    };
-    checkLargeFont();
-    const observer = new MutationObserver(checkLargeFont);
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-  // ▼▼▼ ADICIONE ESTE BLOCO CORRIGIDO AQUI ▼▼▼
   const [user, setUser] = useState(dataManager.getCurrentUser());
-
-  useEffect(() => {
-    const handleAuthChange = () => {
-      setUser(dataManager.getCurrentUser());
-    };
-    window.addEventListener('authChange', handleAuthChange);
-    if (dataManager.isInitialized && !user) {
-        handleAuthChange();
-    }
-    return () => window.removeEventListener('authChange', handleAuthChange);
-  }, []);
-  // ▲▲▲ FIM DO BLOCO PARA ADICIONAR ▲▲▲
-
-  // ▼▼▼ COLE ESTE NOVO BLOCO CORRIGIDO NO LUGAR DO ANTIGO ▼▼▼
-  useEffect(() => {
-    const handleThemeChange = () => {
-      const newTheme = dataManager.getCurrentUser?.()?.settings?.theme || 'light';
-      dataManager.setUserTheme(newTheme);
-    };
-    handleThemeChange();
-    window.addEventListener('themeChanged', handleThemeChange);
-    return () => {
-      window.removeEventListener('themeChanged', handleThemeChange);
-    };
-  }, []);
-
-  // ✨ NOVO: Adiciona um estado para o usuário, que força o componente a re-renderizar
-
-
   const [currentPeriod, setCurrentPeriod] = useState(getCurrentPeriod());
   const [summary, setSummary] = useState<any>(null);
   const [editingIncome, setEditingIncome] = useState(false);
@@ -76,35 +21,9 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
   });
   const [showSpendingAlert, setShowSpendingAlert] = useState(false);
 
-  // ✨ NOVO: Este useEffect "ouve" o sinal do DataManager e atualiza o estado 'user'
-  useEffect(() => {
-    const handleAuthChange = () => {
-      setUser(dataManager.getCurrentUser());
-    };
-    window.addEventListener('authChange', handleAuthChange);
-    if (dataManager.isInitialized && !user) {
-        handleAuthChange();
-    }
-    return () => window.removeEventListener('authChange', handleAuthChange);
-  }, []);
-
- 
-  React.useEffect(() => {
-    if (user?.profile?.name) {
-      window.localStorage.setItem('userName', user.profile.name);
-    }
-  }, [user?.profile?.name]); // 🔄 MODIFICADO: A linha "const user = ..." foi removida de cima
-
   const categories = dataManager.getCategories();
 
-  // 🔄 MODIFICADO: Este useEffect agora espera pelo 'user' antes de rodar
-  useEffect(() => {
-    if (user) {
-      updateSummary();
-    }
-  }, [currentPeriod, user]); // A dependência 'user' foi adicionada
-
-  const updateSummary = () => {
+  const updateSummary = useCallback(() => {
     const newSummary = dataManager.getFinancialSummary(currentPeriod);
     setSummary(newSummary);
     
@@ -114,13 +33,45 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     } else {
       setShowSpendingAlert(false);
     }
-  };
+  }, [currentPeriod]);
 
-  const handleAddTransaction = async (e: React.FormEvent) => { // <-- Adicionado 'async'
+  useEffect(() => {
+    if (user) {
+      updateSummary();
+    }
+  }, [currentPeriod, user, updateSummary]);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const currentUser = dataManager.getCurrentUser();
+      setUser(currentUser);
+      if (currentUser?.profile?.name) {
+        window.localStorage.setItem('userName', currentUser.profile.name);
+      }
+    };
+
+    const handleThemeChange = () => {
+        const themeValue = dataManager.getCurrentUser?.()?.settings?.theme;
+        const newTheme = (themeValue === 'dark' || themeValue === 'light') ? themeValue : 'light';
+        dataManager.setUserTheme(newTheme);
+    };
+
+    window.addEventListener('authChange', handleAuthChange);
+    window.addEventListener('themeChanged', handleThemeChange);
+    
+    handleAuthChange();
+    handleThemeChange();
+
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+      window.removeEventListener('themeChanged', handleThemeChange);
+    };
+  }, []);
+
+  const handleAddTransaction = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount) return;
     
-    // Adicionado 'await' para esperar a confirmação do Firebase
     const transaction = await dataManager.addTransaction({ ...formData, date: currentPeriod + '-01' });
     
     if (transaction) {
@@ -129,111 +80,59 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     } else {
       alert('Erro ao adicionar transação.');
     }
-  };
+  }, [formData, currentPeriod, updateSummary]);
 
-  const deleteTransaction = async (transactionId: string) => { // <-- Adicionado 'async'
+  const deleteTransaction = useCallback(async (transactionId: string) => {
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
-      
-      const success = await dataManager.removeTransaction(transactionId); // <-- Adicionado 'await'
-      
+      const success = await dataManager.removeTransaction(transactionId);
       if (success) {
         updateSummary();
       } else {
         alert('Erro ao excluir transação.');
       }
     }
-  };
+  }, [updateSummary]);
 
-  const handleIncomeEdit = () => {
-  setEditingIncome(true);
-  setTempIncome(summary?.monthlyIncome?.toString() || '');
-};
- const handleIncomeSave = async () => {
-    // Converte o valor do input (que é um texto) para um número.
-    // Se o texto estiver vazio ou for inválido, o valor será 0.
+  const handleIncomeEdit = useCallback(() => {
+    setEditingIncome(true);
+    setTempIncome(summary?.monthlyIncome?.toString() || '');
+  }, [summary]);
+
+  const handleIncomeSave = useCallback(async () => {
     const amount = parseFloat(tempIncome) || 0;
-    
-    // Chama a função do DataManager para salvar a nova renda de forma assíncrona.
-    // O 'await' faz o código esperar a operação terminar.
     const success = await dataManager.setMonthlyIncome(currentPeriod, amount);
     
-    // Verifica se a operação de salvar foi bem-sucedida.
     if (success) {
-      setEditingIncome(false); // Volta para o modo de visualização (esconde o campo de edição).
-      updateSummary(); // Atualiza os dados exibidos na tela para refletir a nova renda.
+      setEditingIncome(false);
+      updateSummary();
     } else {
-      // Se algo deu errado ao salvar, exibe um alerta para o usuário.
       alert('Erro ao salvar a renda mensal.');
     }
-  };
+  }, [tempIncome, currentPeriod, updateSummary]);
 
-const handleSubmit = async (e: React.FormEvent) => { // <-- Adicionado 'async'
-    // ... (lógica para criar dreamData)
-
-    const result = await dataManager.addDream(dreamData); // <-- Adicionado 'await'
-    
-    if (result) {
-      // ...
-      setShowAddModal(false);
-    } else {
-      alert('Erro ao adicionar sonho.');
-    }
-  };
-
-  const handleIncomeCancel = () => {
+  const handleIncomeCancel = useCallback(() => {
     setEditingIncome(false);
     setTempIncome('');
-  };
+  }, []);
 
-  const handlePeriodChange = (newPeriod: string) => {
+  const handlePeriodChange = useCallback((newPeriod: string) => {
     setCurrentPeriod(newPeriod);
-  };
+  }, []);
 
-  const getCategoryColor = (category: string) => {
-    const colors = [
-      'bg-blue-100 text-blue-800',
-      'bg-green-100 text-green-800',
-      'bg-yellow-100 text-yellow-800',
-      'bg-red-100 text-red-800',
-      'bg-purple-100 text-purple-800',
-      'bg-pink-100 text-pink-800',
-      'bg-indigo-100 text-indigo-800',
-      'bg-gray-100 text-gray-800'
-    ];
-    
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-      hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  const getSpendingPercentage = () => {
+  const getSpendingPercentage = useCallback(() => {
     if (!summary || summary.monthlyIncome <= 0) return 0;
     return (summary.totalExpenses / summary.monthlyIncome) * 100;
-  };
+  }, [summary]);
 
- 
-  // ...existing code...
-const getAvailableAmount = () => {
-  if (!summary) return 0;
-  return Math.max((summary.monthlyIncome || 0) - (summary.totalExpenses || 0), 0);
-};
+  const getDailyIncome = useCallback(() => {
+    if (!summary || summary.monthlyIncome <= 0) return 0;
+    return summary.monthlyIncome / 30;
+  }, [summary]);
 
-// Adicione estas funções:
-const getDailyIncome = () => {
-  if (!summary || summary.monthlyIncome <= 0) return 0;
-  return summary.monthlyIncome / 30;
-};
-
-const getAnnualIncome = () => {
-  if (!summary || summary.monthlyIncome <= 0) return 0;
-  return summary.monthlyIncome * 12;
-};
-// ...existing code...
-
-
+  const getAnnualIncome = useCallback(() => {
+    if (!summary || summary.monthlyIncome <= 0) return 0;
+    return summary.monthlyIncome * 12;
+  }, [summary]);
 
   if (!user || !summary) return <div className="text-center p-10">Carregando...</div>;
 
@@ -269,7 +168,7 @@ const getAnnualIncome = () => {
           </div>
         )}
 
-        {/* Header - MANTIDOS EXATAMENTE COMO ESTAVAM conforme solicitação */}
+        {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
             <div className="flex items-center flex-1 min-w-0">
@@ -284,7 +183,6 @@ const getAnnualIncome = () => {
               </div>
             </div>
             
-            {/* Botões do header MANTIDOS ORIGINAIS - conforme solicitação */}
             <div className="flex justify-center flex-wrap gap-2 mt-4 sm:mt-0">
               <button
                 onClick={() => onNavigate('summary')}
@@ -344,8 +242,7 @@ const getAnnualIncome = () => {
               <h2 className=" text-blue-900 dark:text-blue-light leading-tight break-words  text-xl font-bold text-gray-800">{formatPeriod(currentPeriod)}</h2>
               <p className="text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px] text-sm text-gray-600 ">
                 Período atual
-</p>
-
+              </p>
             </div>
             
             <button
@@ -358,238 +255,231 @@ const getAnnualIncome = () => {
             </button>
           </div>
 
-        {/* SEÇÃO RENDA MENSAL - 100% FIEL AO SITE DE REFERÊNCIA COM RESPONSIVIDADE CORRIGIDA */}
-
-{/* MOBILE: Card com tamanho fixo - AJUSTADO FIEL AO PRINT */}
-<div
-  className="block sm:hidden bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border border-blue-200 shadow-[0_4px_24px_0_rgba(37,99,235,0.10)] px-6 pt-5 pb-4 relative mx-auto flex flex-col gap-0 renda-mensal-mobile-card"
-  style={{
-    width: '342.4px',
-    minWidth: '342.4px',
-    height: '234.4px',
-    margin: 0,
-    marginLeft: '-15px',
-    overflow: 'hidden',
-    wordBreak: 'break-word',
-    fontSize: '16px',
-  }}
-  tabIndex={0}
-  aria-label="Card Minha Renda Mensal"
->
-  <div className="flex items-center justify-between mb-3">
-    <div className="flex items-center gap-3">
-      <div className="inline-flex items-center justify-center w-10 h-10 bg-[#2563eb] dark:bg-[#1E293B] rounded-xl">
-        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-        </svg>
-      </div>
-      <div className="flex flex-col min-w-0 max-w-full">
-<h2 className="text-blue-900 dark:text-blue-light text-lg font-bold leading-tight break-words max-w-[210px]">Minha Renda Mensal</h2>
-        <p className="text-xs text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]">Defina sua renda mensal principal</p>
-      </div>
-    </div>
-    {!editingIncome && (
-      <button
-        onClick={handleIncomeEdit}
-        className=" text-blue-900 dark:text-blue-light leading-tight break-words text-[#2563eb] hover:text-[#1e3a8a] transition-colors flex items-center gap-1 text-base font-medium p-1"
-        aria-label="Editar renda mensal"
-        style={{ marginRight: '-15px' }}
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-        </svg>
-      </button>
-    )}
-  </div>
-
-  {editingIncome ? (
-    <div className="space-y-4 mt-2">
-      <label className="text-blue-900 dark:text-blue-light leading-tight break-words  block text-xs font-semibold text-[#1e3a8a] mb-1 leading-tight">Valor da Renda Mensal</label>
-      <div className="w-full">
-        <div className="relative w-full">
-          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#2563eb] text-base font-bold">R$</span>
-          <input
-            type="number"
-            step="0.01"
-            value={tempIncome}
-            onChange={(e) => setTempIncome(e.target.value)}
-            className="w-full h-12 pl-10 pr-4 bg-white border-2 border-[#d3e3fd] rounded-xl text-lg font-bold text-[#1e3a8a] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300"
-            placeholder="0,00"
-            autoFocus
-          />
-        </div>
-      </div>
-      <div className="w-full">
-        <div className="flex flex-row gap-2 w-full mt-2">
-          <button
-            onClick={handleIncomeSave}
-            className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white rounded-xl font-bold text-sm flex items-center justify-center transition-colors shadow-lg w-full min-w-0 px-3"
-            style={{ minWidth: 0 }}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            Salvar
-          </button>
-          <button
-            onClick={handleIncomeCancel}
-            className="flex-1 h-12 bg-white border-2 border-[#d3e3fd] text-[#1e3a8a] rounded-xl font-bold text-sm flex items-center justify-center transition-colors shadow-lg hover:bg-[#eaf2ff] w-full min-w-0 px-3"
-            style={{ minWidth: 0 }}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : (
-    <div className="flex flex-col items-center justify-center w-full">
-    <div
-  className="text-4xl font-bold text-blue-900 dark:text-blue-light mb-2 text-[30px] sm:text-4xl" style={{ fontSize: '30px' }}
-> 
-  {formatCurrency(summary.monthlyIncome || 0)}
-     </div>
-      <div className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ fontSize: '14px' }} data-debug="dark-blue-light-label">Sua renda mensal atual</div>
-      <hr className="w-full h-[2px] border-[#d3e3fd] -mt-[20px] mb-6" style={{ marginTop: '20px' }} />
-      {summary.monthlyIncome > 0 ? (
-        <div className="flex flex-row justify-center items-center gap-2 w-full mt-1">
-          <div className="text-center flex-1">
-            <div className="text-base font-bold text-blue-900 dark:text-blue-light leading-tight" style={{ marginTop: '-18px' }}>
-              {formatCurrency(getDailyIncome())}
+        {/* SEÇÃO RENDA MENSAL */}
+        <div
+          className="block sm:hidden bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border border-blue-200 shadow-[0_4px_24px_0_rgba(37,99,235,0.10)] px-6 pt-5 pb-4 relative mx-auto flex flex-col gap-0 renda-mensal-mobile-card"
+          style={{
+            width: '342.4px',
+            minWidth: '342.4px',
+            height: '234.4px',
+            margin: 0,
+            marginLeft: '-15px',
+            overflow: 'hidden',
+            wordBreak: 'break-word',
+            fontSize: '16px',
+          }}
+          tabIndex={0}
+          aria-label="Card Minha Renda Mensal"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center justify-center w-10 h-10 bg-[#2563eb] dark:bg-[#1E293B] rounded-xl">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                </svg>
+              </div>
+              <div className="flex flex-col min-w-0 max-w-full">
+                <h2 className="text-blue-900 dark:text-blue-light text-lg font-bold leading-tight break-words max-w-[210px]">Minha Renda Mensal</h2>
+                <p className="text-xs text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]">Defina sua renda mensal principal</p>
+              </div>
             </div>
-            <p className="text-xs text-blue-900 dark:text-blue-light m-0 leading-tight">Por dia</p>
+            {!editingIncome && (
+              <button
+                onClick={handleIncomeEdit}
+                className=" text-blue-900 dark:text-blue-light leading-tight break-words text-[#2563eb] hover:text-[#1e3a8a] transition-colors flex items-center gap-1 text-base font-medium p-1"
+                aria-label="Editar renda mensal"
+                style={{ marginRight: '-15px' }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+              </button>
+            )}
           </div>
-          <div className="text-center flex-1">
-            <div className="text-base font-bold text-blue-900 dark:text-blue-light leading-tight" style={{ marginTop: '-18px' }}>
-              {formatCurrency(getAnnualIncome())}
-            </div>
-            <p className="text-xs text-blue-900 dark:text-blue-light m-0 leading-tight">Por ano</p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center w-full mt-1">
-    <p className="text-sm text-blue-700 text-center break-words max-w-full -mt-[15px] md:mt-0">
-  Clique em "Editar" para definir sua renda mensal
-</p>
-        </div>
-      )}
-    </div>
-  )}
-</div>
 
-{/* DESKTOP: Card responsivo */}
-<div className="hidden sm:block bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-6 mb-6 border border-blue-100 w-full max-w-[1104px] h-[258.4px] shadow-lg relative mx-auto">
-  <div className="flex items-center justify-between mb-6">
-    <div className="flex items-center gap-4">
-      <div className="inline-flex items-center justify-center w-14 h-14 bg-[#2563eb] dark:bg-[#1E293B] rounded-2xl">
-        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-        </svg>
-      </div>
-      <div>
-        <h2 className="text-xl font-bold text-blue-900 dark:text-blue-light">Minha Renda Mensal</h2>
-        <p className="text-sm text-blue-900 dark:text-blue-light">Defina sua renda mensal principal</p>
-      </div>
-    </div>
-    {!editingIncome && (
-      <button
-        onClick={handleIncomeEdit}
-        className="text-blue-900 dark:text-blue-light leading-tight break-words  hover:text-[#1e3a8a] transition-colors flex items-center gap-2 text-base font-medium"
-        aria-label="Editar renda mensal"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-        </svg>
-        Editar
-      </button>
-    )}
-  </div>
-
-  {editingIncome ? (
-    <div className="space-y-6">
-      <label className="text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ marginBottom: '-5px', marginTop: '-15px' , fontSize: '14px'}}>
-        Valor da Renda Mensal
-      </label>
-      <div className="w-full">
-        <div className="relative w-full" style={{ marginTop: '-19px' }}>
-          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#2563eb] text-lg font-bold">R$</span>
-          <input
-            type="number"
-            step="0.01"
-            value={tempIncome}
-            onChange={(e) => setTempIncome(e.target.value)}
-            className="w-full h-14 pl-12 pr-4 bg-white border-2 border-[#d3e3fd] rounded-2xl text-2xl font-bold text-[#1e3a8a] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300"
-            placeholder="0,00"
-            autoFocus
-          />
-        </div>
-      </div>
-      <div className="w-full" style={{ marginTop: 0, paddingTop: 0 }}>
-        <div className="flex flex-row gap-4 w-full" style={{ marginTop: '7px', paddingTop: 0 }}>
-          <button
-            onClick={handleIncomeSave}
-            className="flex-1 h-14 bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white rounded-2xl font-bold text-base flex items-center justify-center transition-colors shadow-lg w-full min-w-0 px-[16px]"
-            style={{ minWidth: 0 }}
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            Salvar
-          </button>
-          <button
-            onClick={handleIncomeCancel}
-            className="flex-1 h-14 bg-white border-2 border-[#d3e3fd] text-[#1e3a8a] rounded-2xl font-bold text-base flex items-center justify-center transition-colors shadow-lg hover:bg-[#eaf2ff] w-full min-w-0 px-[16px]"
-            style={{ minWidth: 0 }}
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : (
-    <div className="flex flex-col items-center justify-center">
-      <div className="text-4xl font-bold text-blue-900 dark:text-blue-light mb-2 text-[30px] sm:text-4xl" style={{ fontSize: '30px' }}>
-        {formatCurrency(summary.monthlyIncome || 0)}
-      </div>
-      <div className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ fontSize: '14px' }} data-debug="dark-blue-light-label">Sua renda mensal atual</div>
-      <hr className="w-full h-[2px] border-[#d3e3fd] -mt-[20px] mb-6" style={{ marginTop: '0.15px' }} />
-      {summary.monthlyIncome > 0 ? (
-        <div className="flex flex-row justify-center items-center gap-2 w-full mt-1">
-          <div className="text-center flex-1">
-            <div className="mb-2 text-blue-900 dark:text-[#1e3a8a] leading-tight break-words max-w-[210px]"style={{ fontSize: '16px',margin: '0', marginLeft: '155px' , fontWeight: 'bold' }}>
-              {formatCurrency(getDailyIncome())}
+          {editingIncome ? (
+            <div className="space-y-4 mt-2">
+              <label className="text-blue-900 dark:text-blue-light leading-tight break-words  block text-xs font-semibold text-[#1e3a8a] mb-1 leading-tight">Valor da Renda Mensal</label>
+              <div className="w-full">
+                <div className="relative w-full">
+                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#2563eb] text-base font-bold">R$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={tempIncome}
+                    onChange={(e) => setTempIncome(e.target.value)}
+                    className="w-full h-12 pl-10 pr-4 bg-white border-2 border-[#d3e3fd] rounded-xl text-lg font-bold text-[#1e3a8a] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300"
+                    placeholder="0,00"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="w-full">
+                <div className="flex flex-row gap-2 w-full mt-2">
+                  <button
+                    onClick={handleIncomeSave}
+                    className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white rounded-xl font-bold text-sm flex items-center justify-center transition-colors shadow-lg w-full min-w-0 px-3"
+                    style={{ minWidth: 0 }}
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Salvar
+                  </button>
+                  <button
+                    onClick={handleIncomeCancel}
+                    className="flex-1 h-12 bg-white border-2 border-[#d3e3fd] text-[#1e3a8a] rounded-xl font-bold text-sm flex items-center justify-center transition-colors shadow-lg hover:bg-[#eaf2ff] w-full min-w-0 px-3"
+                    style={{ minWidth: 0 }}
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             </div>
-            <p className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]"style={{ fontSize: '12px',margin: '0', marginLeft: '155px'  }}>Por dia</p>
-          </div>
-          <div className="text-center flex-1">
-            <div className="mb-2 text-blue-900 dark:text-[#1e3a8a] leading-tight break-words max-w-[210px]"style={{ fontSize: '16px',margin: '0', marginLeft: '155px' , fontWeight: 'bold' }}>
-              {formatCurrency(getAnnualIncome())}
+          ) : (
+            <div className="flex flex-col items-center justify-center w-full">
+            <div
+          className="text-4xl font-bold text-blue-900 dark:text-blue-light mb-2 text-[30px] sm:text-4xl" style={{ fontSize: '30px' }}
+        > 
+          {formatCurrency(summary.monthlyIncome || 0)}
+             </div>
+              <div className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ fontSize: '14px' }} data-debug="dark-blue-light-label">Sua renda mensal atual</div>
+              <hr className="w-full h-[2px] border-[#d3e3fd] -mt-[20px] mb-6" style={{ marginTop: '20px' }} />
+              {summary.monthlyIncome > 0 ? (
+                <div className="flex flex-row justify-center items-center gap-2 w-full mt-1">
+                  <div className="text-center flex-1">
+                    <div className="text-base font-bold text-blue-900 dark:text-blue-light leading-tight" style={{ marginTop: '-18px' }}>
+                      {formatCurrency(getDailyIncome())}
+                    </div>
+                    <p className="text-xs text-blue-900 dark:text-blue-light m-0 leading-tight">Por dia</p>
+                  </div>
+                  <div className="text-center flex-1">
+                    <div className="text-base font-bold text-blue-900 dark:text-blue-light leading-tight" style={{ marginTop: '-18px' }}>
+                      {formatCurrency(getAnnualIncome())}
+                    </div>
+                    <p className="text-xs text-blue-900 dark:text-blue-light m-0 leading-tight">Por ano</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center w-full mt-1">
+            <p className="text-sm text-blue-700 text-center break-words max-w-full -mt-[15px] md:mt-0">
+          Clique em "Editar" para definir sua renda mensal
+        </p>
+                </div>
+              )}
             </div>
-            <p className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]"style={{ fontSize: '12px',margin: '0', marginLeft: '155px'  }}>Por ano</p>
-          </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center w-full mt-1">
-      <p className="text-sm text-blue-700 text-center break-words max-w-full">Clique em "Editar" para definir sua renda mensal</p>
-        </div>
-      )}
-    </div>
-  )}
-</div>
 
-          {/* Quick Stats - Cards EMPILHADOS VERTICALMENTE em mobile conforme site de referência */}
-          {/* MOBILE: cards com espaçamento ajustado */}
+        <div className="hidden sm:block bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-6 mb-6 border border-blue-100 w-full max-w-[1104px] h-[258.4px] shadow-lg relative mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 bg-[#2563eb] dark:bg-[#1E293B] rounded-2xl">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-blue-900 dark:text-blue-light">Minha Renda Mensal</h2>
+                <p className="text-sm text-blue-900 dark:text-blue-light">Defina sua renda mensal principal</p>
+              </div>
+            </div>
+            {!editingIncome && (
+              <button
+                onClick={handleIncomeEdit}
+                className="text-blue-900 dark:text-blue-light leading-tight break-words  hover:text-[#1e3a8a] transition-colors flex items-center gap-2 text-base font-medium"
+                aria-label="Editar renda mensal"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Editar
+              </button>
+            )}
+          </div>
+
+          {editingIncome ? (
+            <div className="space-y-6">
+              <label className="text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ marginBottom: '-5px', marginTop: '-15px' , fontSize: '14px'}}>
+                Valor da Renda Mensal
+              </label>
+              <div className="w-full">
+                <div className="relative w-full" style={{ marginTop: '-19px' }}>
+                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#2563eb] text-lg font-bold">R$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={tempIncome}
+                    onChange={(e) => setTempIncome(e.target.value)}
+                    className="w-full h-14 pl-12 pr-4 bg-white border-2 border-[#d3e3fd] rounded-2xl text-2xl font-bold text-[#1e3a8a] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300"
+                    placeholder="0,00"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="w-full" style={{ marginTop: 0, paddingTop: 0 }}>
+                <div className="flex flex-row gap-4 w-full" style={{ marginTop: '7px', paddingTop: 0 }}>
+                  <button
+                    onClick={handleIncomeSave}
+                    className="flex-1 h-14 bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white rounded-2xl font-bold text-base flex items-center justify-center transition-colors shadow-lg w-full min-w-0 px-[16px]"
+                    style={{ minWidth: 0 }}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Salvar
+                  </button>
+                  <button
+                    onClick={handleIncomeCancel}
+                    className="flex-1 h-14 bg-white border-2 border-[#d3e3fd] text-[#1e3a8a] rounded-2xl font-bold text-base flex items-center justify-center transition-colors shadow-lg hover:bg-[#eaf2ff] w-full min-w-0 px-[16px]"
+                    style={{ minWidth: 0 }}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center">
+              <div className="text-4xl font-bold text-blue-900 dark:text-blue-light mb-2 text-[30px] sm:text-4xl" style={{ fontSize: '30px' }}>
+                {formatCurrency(summary.monthlyIncome || 0)}
+              </div>
+              <div className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]" style={{ fontSize: '14px' }} data-debug="dark-blue-light-label">Sua renda mensal atual</div>
+              <hr className="w-full h-[2px] border-[#d3e3fd] -mt-[20px] mb-6" style={{ marginTop: '0.15px' }} />
+              {summary.monthlyIncome > 0 ? (
+                <div className="flex flex-row justify-center items-center gap-2 w-full mt-1">
+                  <div className="text-center flex-1">
+                    <div className="mb-2 text-blue-900 dark:text-[#1e3a8a] leading-tight break-words max-w-[210px]"style={{ fontSize: '16px',margin: '0', marginLeft: '155px' , fontWeight: 'bold' }}>
+                      {formatCurrency(getDailyIncome())}
+                    </div>
+                    <p className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]"style={{ fontSize: '12px',margin: '0', marginLeft: '155px'  }}>Por dia</p>
+                  </div>
+                  <div className="text-center flex-1">
+                    <div className="mb-2 text-blue-900 dark:text-[#1e3a8a] leading-tight break-words max-w-[210px]"style={{ fontSize: '16px',margin: '0', marginLeft: '155px' , fontWeight: 'bold' }}>
+                      {formatCurrency(getAnnualIncome())}
+                    </div>
+                    <p className="mb-2 text-blue-900 dark:text-blue-light leading-tight break-words max-w-[210px]"style={{ fontSize: '12px',margin: '0', marginLeft: '155px'  }}>Por ano</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center w-full mt-1">
+              <p className="text-sm text-blue-700 text-center break-words max-w-full">Clique em "Editar" para definir sua renda mensal</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+          {/* Quick Stats */}
           <div className="block sm:hidden w-full" style={{ marginTop: '18px' }}>
-            {/* Espaço menor entre Minha Renda Mensal e Receitas Extras */}
             <div style={{ height: '10px' }} />
-            {/* Cards de resumo mobile */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'center' }}>
-              {/* Card Receitas Extras */}
               <div
                 className=" leading-tight break-words max-w-[210px] rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full md:w-auto bg-green-50 dark:bg-[#064E3B]"
                 style={{
@@ -610,157 +500,127 @@ const getAnnualIncome = () => {
                   <div className="text-base text-green-700 font-medium leading-tight">Receitas Extras</div>
                 </div>
               </div>
-              {/* Card Gastos */}
-           {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO BLOCO CORRIGIDO ▼▼▼ */}
-{/* Card Gastos */}
-<div
-  className="bg-red-50 dark:bg-[#7f1d1d] rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full"
-  style={{
-    maxWidth: '357.33px',
-    minHeight: '110px',
-    // A linha 'background' foi REMOVIDA do style
-  }}
->
-  <div className="flex flex-col items-center justify-center w-full h-full py-3">
-    <div className="inline-flex items-center justify-center w-10 h-10 bg-red-600 rounded-full mb-2">
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
-    </div>
-    <div className="font-bold text-red-700 dark:text-red-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalExpenses)}</div>
-    <div className="text-base text-red-700 dark:text-red-300 font-medium leading-tight">Gastos</div>
-    {summary.monthlyIncome > 0 && (
-      <div className="text-xs text-red-500 dark:text-red-400 mt-1" style={{ fontWeight: 500 }}>
-        {((summary.totalExpenses / summary.monthlyIncome) * 100).toFixed(1)}% da renda
-      </div>
-    )}
-  </div>
-</div>
-   {/* Card Saldo Atual (MOBILE) */}
-<div
-  className={
-    `rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full md:w-auto ` +
-    (summary?.balance >= 0 ? 'bg-blue-50 dark:bg-[#1E3A8A]' : 'bg-red-50 dark:bg-[#7F1D1D]')
-  }
-  style={{
-    width: '100%',
-    maxWidth: '357.33px',
-    minHeight: '110px',
-    padding: '0',
-  }}
->
-  <div className="flex flex-col items-center justify-center w-full h-full py-3">
-    <div className={
-      `inline-flex items-center justify-center w-10 h-10 rounded-full mb-2 ` +
-      (summary?.balance >= 0 ? 'bg-blue-600' : 'bg-red-600')
-    }>
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-      </svg>
-    </div>
+              <div
+                className="bg-red-50 dark:bg-[#7f1d1d] rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full"
+                style={{
+                  maxWidth: '357.33px',
+                  minHeight: '110px',
+                }}
+              >
+                <div className="flex flex-col items-center justify-center w-full h-full py-3">
+                  <div className="inline-flex items-center justify-center w-10 h-10 bg-red-600 rounded-full mb-2">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                  </div>
+                  <div className="font-bold text-red-700 dark:text-red-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalExpenses)}</div>
+                  <div className="text-base text-red-700 dark:text-red-300 font-medium leading-tight">Gastos</div>
+                  {summary.monthlyIncome > 0 && (
+                    <div className="text-xs text-red-500 dark:text-red-400 mt-1" style={{ fontWeight: 500 }}>
+                      {((summary.totalExpenses / summary.monthlyIncome) * 100).toFixed(1)}% da renda
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div
+                className={
+                  `rounded-2xl shadow flex flex-col items-center justify-center mx-auto w-full md:w-auto ` +
+                  (summary?.balance >= 0 ? 'bg-blue-50 dark:bg-[#1E3A8A]' : 'bg-red-50 dark:bg-[#7F1D1D]')
+                }
+                style={{
+                  width: '100%',
+                  maxWidth: '357.33px',
+                  minHeight: '110px',
+                  padding: '0',
+                }}
+              >
+                <div className="flex flex-col items-center justify-center w-full h-full py-3">
+                  <div className={
+                    `inline-flex items-center justify-center w-10 h-10 rounded-full mb-2 ` +
+                    (summary?.balance >= 0 ? 'bg-blue-600' : 'bg-red-600')
+                  }>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                  </div>
 
-    <div
-      className={
-        `font-bold text-[1.5rem] leading-tight mb-1 ` +
-        (summary?.balance >= 0 ? 'text-blue-700 dark:text-blue-200' : 'text-red-700 dark:text-red-200')
-      }
-      style={{ letterSpacing: '-1px' }}
-    >
-      {
-        typeof summary?.balance === 'number'
-          ? (summary.balance >= 0
-            ? formatCurrency(summary.balance)
-            : `R$ - ${formatCurrency(Math.abs(summary.balance)).replace('R$', '').trim()}`)
-          : 'Carregando...'
-      }
-    </div>
+                  <div
+                    className={
+                      `font-bold text-[1.5rem] leading-tight mb-1 ` +
+                      (summary?.balance >= 0 ? 'text-blue-700 dark:text-blue-200' : 'text-red-700 dark:text-red-200')
+                    }
+                    style={{ letterSpacing: '-1px' }}
+                  >
+                    {
+                      typeof summary?.balance === 'number'
+                        ? (summary.balance >= 0
+                          ? formatCurrency(summary.balance)
+                          : `R$ - ${formatCurrency(Math.abs(summary.balance)).replace('R$', '').trim()}`)
+                        : 'Carregando...'
+                    }
+                  </div>
 
-    <div className={
-      `text-base font-medium leading-tight ` +
-      (summary?.balance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300')
-    }>
-      Saldo Atual
-    </div>
-  </div>
-</div>
-
-
-
-
-
-            </div>          </div>
-          {/* DESKTOP: mantém grid original */}
+                  <div className={
+                    `text-base font-medium leading-tight ` +
+                    (summary?.balance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300')
+                  }>
+                    Saldo Atual
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {/* Card Receitas Extras */}
-        {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE, AGORA COM O MESMO PADRÃO DO CARD "GASTOS" ▼▼▼ */}
-<div className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center p-3">
-  <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
-    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-    </svg>
-  </div>
-  <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
-  <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
-</div>
-
-            {/* Card Gastos */}
- {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO BLOCO CORRIGIDO ▼▼▼ */}
-{/* Card Gastos Totais */}
-<div className="bg-red-50 dark:bg-[#7f1d1d] rounded-2xl shadow flex flex-col items-center justify-center p-3">
-  <div className="inline-flex items-center justify-center w-10 h-10 bg-red-600 rounded-full mb-2">
-    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
-  </div>
-  <div className="font-bold text-red-700 dark:text-red-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalExpenses)}</div>
-  <div className="text-base text-red-700 dark:text-red-300 font-medium leading-tight">Gastos</div>
-  {summary.monthlyIncome > 0 && (
-      <div className="text-xs text-red-500 dark:text-red-400 mt-1" style={{ fontWeight: 500 }}>
-          {((summary.totalExpenses / summary.monthlyIncome) * 100).toFixed(1)}% da renda
-      </div>
-  )}
-</div>
-            {/* Card Saldo */}
-            {/* Card Saldo Atual (DESKTOP) */}
-<div className={`
-  rounded-2xl shadow flex flex-col items-center justify-center p-3
-  ${summary.balance >= 0 ? 'bg-blue-50 dark:bg-[#1E3A8A]' : 'bg-red-50 dark:bg-[#7F1D1D]'}
-`}>
-  <div className={`
-    inline-flex items-center justify-center w-10 h-10 rounded-full mb-2
-    ${summary.balance >= 0 ? 'bg-blue-600' : 'bg-red-600'}
-  `}>
-    {/* ÍCONE ORIGINAL: CIFRÃO */}
-    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-    </svg>
-  </div>
-  <div className={`
-    font-bold text-[1.5rem] leading-tight mb-1
-    ${summary.balance >= 0 ? 'text-blue-700 dark:text-blue-200' : 'text-red-700 dark:text-red-200'}
-  `} style={{ letterSpacing: '-1px' }}>
-    {summary.balance >= 0
-      ? formatCurrency(summary.balance)
-      : `R$ - ${formatCurrency(Math.abs(summary.balance)).replace('R$', '').trim()}`}
-  </div>
-  <div className={`
-    text-base font-medium leading-tight
-    ${summary.balance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300'}
-  `}>
-    Saldo Atual
-  </div>
-</div>
-
-
+            <div className="bg-green-50 dark:bg-[#064E3B] rounded-2xl shadow flex flex-col items-center justify-center p-3">
+              <div className="inline-flex items-center justify-center w-10 h-10 bg-green-600 rounded-full mb-2">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+              </div>
+              <div className="font-bold text-green-700 dark:text-green-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalIncome)}</div>
+              <div className="text-base text-green-700 dark:text-green-300 font-medium leading-tight">Receitas Extras</div>
+            </div>
+            <div className="bg-red-50 dark:bg-[#7f1d1d] rounded-2xl shadow flex flex-col items-center justify-center p-3">
+              <div className="inline-flex items-center justify-center w-10 h-10 bg-red-600 rounded-full mb-2">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+              </div>
+              <div className="font-bold text-red-700 dark:text-red-200 text-[1.5rem] leading-tight mb-1" style={{letterSpacing: '-1px'}}>{formatCurrency(summary.totalExpenses)}</div>
+              <div className="text-base text-red-700 dark:text-red-300 font-medium leading-tight">Gastos</div>
+              {summary.monthlyIncome > 0 && (
+                  <div className="text-xs text-red-500 dark:text-red-400 mt-1" style={{ fontWeight: 500 }}>
+                      {((summary.totalExpenses / summary.monthlyIncome) * 100).toFixed(1)}% da renda
+                  </div>
+              )}
+            </div>
+            <div className={`
+              rounded-2xl shadow flex flex-col items-center justify-center p-3
+              ${summary.balance >= 0 ? 'bg-blue-50 dark:bg-[#1E3A8A]' : 'bg-red-50 dark:bg-[#7F1D1D]'}
+            `}>
+              <div className={`
+                inline-flex items-center justify-center w-10 h-10 rounded-full mb-2
+                ${summary.balance >= 0 ? 'bg-blue-600' : 'bg-red-600'}
+              `}>
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                </svg>
+              </div>
+              <div className={`
+                font-bold text-[1.5rem] leading-tight mb-1
+                ${summary.balance >= 0 ? 'text-blue-700 dark:text-blue-200' : 'text-red-700 dark:text-red-200'}
+              `} style={{ letterSpacing: '-1px' }}>
+                {summary.balance >= 0
+                  ? formatCurrency(summary.balance)
+                  : `R$ - ${formatCurrency(Math.abs(summary.balance)).replace('R$', '').trim()}`}
+              </div>
+              <div className={`
+                text-base font-medium leading-tight
+                ${summary.balance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300'}
+              `}>
+                Saldo Atual
+              </div>
+            </div>
           </div>   
-             <br/>
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
+          <br/>
+          <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
           <br />
-
-         
-
-
-
-
-         
-
-
 
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
@@ -862,73 +722,66 @@ const getAnnualIncome = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* ▼▼▼ SUBSTITUA O BLOCO ANTIGO POR ESTE NOVO E CORRIGIDO ▼▼▼ */}
-{summary.transactions.map((transaction: any) => (
-  <div
-    key={transaction.id}
-    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border ${
-      transaction.type === 'income' 
-        ? 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-800' 
-        : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800'
-    }`}
-  >
-    {/* Parte Esquerda: Ícone e Textos */}
-    <div className="flex items-center flex-1 min-w-0 w-full">
-      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
-        transaction.type === 'income' 
-          ? 'bg-green-600 text-white' 
-          : 'bg-red-600 text-white'
-      }`}>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          {transaction.type === 'income' 
-            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-          }
-        </svg>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
-          <span>{transaction.date}</span>
-          <span className="mx-2">•</span>
-      <span
-  className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800/50 dark:!text-blue-300"
-  style={{ color: '#1666B6' }}
->
-  {transaction.category}
-</span>
-        </div>
-      </div>
-    </div>
-
-    {/* Parte Direita: Valor e Botão de Excluir */}
-    {/* 👇 MUDANÇA AQUI: de 'justify-between' para 'justify-start' e adicionado 'gap-4' */}
-    <div className="flex items-center justify-end sm:justify-end gap-4 w-full sm:w-auto mt-3 sm:mt-0">
-      <span className={`text-lg font-bold ${
-        transaction.type === 'income' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-      }`}>
-        {transaction.type === 'income' 
-          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
-          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
-      </span>
-  <button
-  onClick={() => deleteTransaction(transaction.id)}
- className="text-red-500 dark:text-red-400 transition-colors p-2 rounded-lg border-none"
-  title="Excluir transação"
->
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-  </svg>
-</button>
-    </div>
-  </div>
-))}
+                {summary.transactions.map((transaction: any) => (
+                  <div
+                    key={transaction.id}
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border ${
+                      transaction.type === 'income' 
+                        ? 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-800' 
+                        : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800'
+                    }`}
+                  >
+                    <div className="flex items-center flex-1 min-w-0 w-full">
+                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mr-4 flex-shrink-0 ${
+                        transaction.type === 'income' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-red-600 text-white'
+                      }`}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {transaction.type === 'income' 
+                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                          }
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
+                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <span>{transaction.date}</span>
+                          <span className="mx-2">•</span>
+                          <span
+                            className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800/50 dark:!text-blue-300"
+                            style={{ color: '#1666B6' }}
+                          >
+                            {transaction.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end sm:justify-end gap-4 w-full sm:w-auto mt-3 sm:mt-0">
+                      <span className={`text-lg font-bold ${
+                        transaction.type === 'income' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                      }`}>
+                        {transaction.type === 'income' 
+                          ? formatCurrency(transaction.amount).replace('R$', 'R$ +') 
+                          : formatCurrency(transaction.amount).replace('R$', 'R$ -')}
+                      </span>
+                      <button
+                        onClick={() => deleteTransaction(transaction.id)}
+                        className="text-red-500 dark:text-red-400 transition-colors p-2 rounded-lg border-none"
+                        title="Excluir transação"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
-
-
       </div>
     </div>
   );

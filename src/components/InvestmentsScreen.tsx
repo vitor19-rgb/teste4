@@ -22,7 +22,7 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
   const [searchTerm, setSearchTerm] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [userBalance, setUserBalance] = useState(0); 
+  const [userBalance, setUserBalance] = useState(0);
 
   useEffect(() => {
     const fetchUserBalance = () => {
@@ -42,10 +42,30 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
   useEffect(() => {
     const fetchStocks = async () => {
       setIsLoading(true);
+      const cacheKey = 'stocksCache';
+      const cachedData = sessionStorage.getItem(cacheKey);
+      const now = new Date().getTime();
+
+      if (cachedData) {
+        const { timestamp, data } = JSON.parse(cachedData);
+        // Usar cache se tiver menos de 1 hora (3600000 ms)
+        if (now - timestamp < 3600000) {
+          setStocks(data);
+          setFilteredStocks(data);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       try {
         const response = await fetch('https://brapi.dev/api/quote/list');
         const data = await response.json();
         if (data && data.stocks) {
+          const cachePayload = {
+            timestamp: now,
+            data: data.stocks
+          };
+          sessionStorage.setItem(cacheKey, JSON.stringify(cachePayload));
           setStocks(data.stocks);
           setFilteredStocks(data.stocks);
         }
@@ -70,37 +90,41 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
   const totalCost = selectedStock ? selectedStock.close * purchaseAmount : 0;
   const isPurchaseDisabled = !selectedStock || totalCost <= 0 || totalCost > userBalance;
 
-  const handleSelectStock = (stock: Stock) => {
+  const handleSelectStock = React.useCallback((stock: Stock) => {
     setSelectedStock(stock);
     setPurchaseAmount(1);
-  };
+  }, []);
 
-  const handleSimulatePurchase = async () => { // <-- Adicionado 'async'
+  const handleSimulatePurchase = () => {
     if (isPurchaseDisabled || !selectedStock) return;
 
-    // Prepara os dados da transação
     const transactionData = {
       description: `Compra de Ações: ${selectedStock.stock}`,
       amount: totalCost,
-      type: 'expense', // É um gasto
-      category: 'Investimentos', // Nova categoria
-      date: new Date().toISOString().split('T')[0] // Data de hoje
+      type: 'expense' as 'expense',
+      category: 'Investimentos',
+      date: new Date().toISOString().split('T')[0]
     };
 
-    // Salva a transação no Firebase
-    const transaction = await dataManager.addTransaction(transactionData);
+    // Navega imediatamente para uma experiência de usuário responsiva
+    onNavigate('main');
+    alert('Sua simulação de compra foi enviada e será processada em segundo plano.');
 
-    if (transaction) {
-      alert(`Investimento em ${selectedStock.stock} registrado com sucesso!`);
-      
-      // Avisa outras partes do app que os dados mudaram
-      window.dispatchEvent(new CustomEvent('datachanged'));
-      
-      // Volta para a tela principal para ver o resultado
-      onNavigate('main');
-    } else {
-      alert('Ocorreu um erro ao registrar o investimento.');
-    }
+    // Realiza a operação de banco de dados em segundo plano
+    dataManager.addTransaction(transactionData)
+      .then(transaction => {
+        if (transaction) {
+          console.log('Transação bem-sucedida, despachando evento datachanged.');
+          window.dispatchEvent(new CustomEvent('datachanged'));
+        } else {
+          // Opcional: notificar o usuário sobre a falha de uma forma não intrusiva
+          console.error('Falha ao registrar a transação em segundo plano.');
+        }
+      })
+      .catch(error => {
+        console.error("Erro ao registrar o investimento em segundo plano:", error);
+        // Opcional: notificar o usuário sobre a falha
+      });
   };
 
   return (
