@@ -95,7 +95,7 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
     setPurchaseAmount(1);
   }, []);
 
-  const handleSimulatePurchase = () => {
+  const handleSimulatePurchase = React.useCallback(() => {
     if (isPurchaseDisabled || !selectedStock) return;
 
     const transactionData = {
@@ -106,26 +106,25 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
       date: new Date().toISOString().split('T')[0]
     };
 
-    // Navega imediatamente para uma experiência de usuário responsiva
+    // 1. Navega imediatamente para a tela principal. Essa é a resposta visual primária.
     onNavigate('main');
-    alert('Sua simulação de compra foi enviada e será processada em segundo plano.');
 
-    // Realiza a operação de banco de dados em segundo plano
+    // 2. A operação de banco de dados é despachada para ocorrer em segundo plano,
+    // sem nenhum alerta para não bloquear ou atrasar a renderização no mobile.
     dataManager.addTransaction(transactionData)
       .then(transaction => {
         if (transaction) {
-          console.log('Transação bem-sucedida, despachando evento datachanged.');
+          // 3. Quando a transação for concluída, dispara o evento para atualizar os dados.
+          // A tela principal, que já está visível, irá refletir a mudança.
           window.dispatchEvent(new CustomEvent('datachanged'));
         } else {
-          // Opcional: notificar o usuário sobre a falha de uma forma não intrusiva
           console.error('Falha ao registrar a transação em segundo plano.');
         }
       })
       .catch(error => {
         console.error("Erro ao registrar o investimento em segundo plano:", error);
-        // Opcional: notificar o usuário sobre a falha
       });
-  };
+  }, [isPurchaseDisabled, selectedStock, totalCost, onNavigate]);
 
   return (
     <div className="min-h-screen bg-slate-100 p-4">
