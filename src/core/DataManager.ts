@@ -585,7 +585,7 @@ class DataManager {
       profile: { name: userData.name, email: userData.email, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() },
       financial: {
         monthlyIncomes: {}, transactions: [],
-        categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Outros'],
+        categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Investimentos', 'Outros'], // <-- Adicionado aqui
         goals: [], categoryBudgets: {}, dreams: [], alerts: []
       },
       settings: { currency: 'BRL', theme: 'light', notifications: true }

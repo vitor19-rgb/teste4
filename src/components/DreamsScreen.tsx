@@ -1,8 +1,7 @@
 /**
  * DreamsScreen - Tela de Simulador de Sonhos
  * Design profissional corporativo com WCAG 2.1 compliance
- * NOVA FUNCIONALIDADE
- * CORREÇÃO: Responsividade aprimorada para novos elementos
+ * VERSÃO CORRIGIDA: Funções de salvar, editar e apagar com async/await.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -34,7 +33,8 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     setDreams(userDreams);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ▼▼▼ FUNÇÃO CORRIGIDA COM ASYNC/AWAIT ▼▼▼
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.totalValue) return;
@@ -51,7 +51,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     if (formData.calculationType === 'date' && formData.targetDate) {
       dreamData.targetDate = formData.targetDate;
       
-      // Calcular valor mensal necessário
       const targetDate = new Date(formData.targetDate);
       const currentDate = new Date();
       const monthsDiff = (targetDate.getFullYear() - currentDate.getFullYear()) * 12 + 
@@ -65,7 +64,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
       if (monthlyAmount > 0) {
         dreamData.monthlyAmount = monthlyAmount;
         
-        // Calcular data estimada
         const monthsNeeded = Math.ceil(totalValue / monthlyAmount);
         const targetDate = new Date();
         targetDate.setMonth(targetDate.getMonth() + monthsNeeded);
@@ -73,7 +71,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
       }
     }
 
-    const result = dataManager.addDream(dreamData);
+    const result = await dataManager.addDream(dreamData);
     if (result) {
       updateDreams();
       setFormData({
@@ -85,6 +83,8 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
       });
       setCalculationResult(null);
       setShowAddModal(false);
+    } else {
+        alert('Ocorreu um erro ao criar o sonho. Tente novamente.');
     }
   };
 
@@ -139,15 +139,25 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     calculatePreview();
   }, [formData.totalValue, formData.targetDate, formData.monthlyAmount, formData.calculationType, formData.name]);
 
-  const updateSavings = (dreamId: string, newAmount: number) => {
-    dataManager.updateDreamSavings(dreamId, newAmount);
-    updateDreams();
+  // ▼▼▼ FUNÇÃO CORRIGIDA COM ASYNC/AWAIT ▼▼▼
+  const updateSavings = async (dreamId: string, newAmount: number) => {
+    const success = await dataManager.updateDreamSavings(dreamId, newAmount);
+    if (success) {
+      updateDreams();
+    } else {
+      alert('Erro ao atualizar o valor economizado. Tente novamente.');
+    }
   };
 
-  const deleteDream = (dreamId: string, dreamName: string) => {
+  // ▼▼▼ FUNÇÃO CORRIGIDA COM ASYNC/AWAIT ▼▼▼
+  const deleteDream = async (dreamId: string, dreamName: string) => {
     if (confirm(`Tem certeza que deseja excluir o sonho "${dreamName}"?`)) {
-      dataManager.removeDream(dreamId);
-      updateDreams();
+      const success = await dataManager.removeDream(dreamId);
+      if (success) {
+        updateDreams();
+      } else {
+        alert('Erro ao excluir o sonho. Tente novamente.');
+      }
     }
   };
 

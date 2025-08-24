@@ -75,7 +75,6 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     category: 'Outros'
   });
   const [showSpendingAlert, setShowSpendingAlert] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
 
   // ✨ NOVO: Este useEffect "ouve" o sinal do DataManager e atualiza o estado 'user'
   useEffect(() => {
@@ -89,7 +88,7 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
-  // Salva o nome do usuário no localStorage para uso em outros componentes (ex: exportar PDF)
+ 
   React.useEffect(() => {
     if (user?.profile?.name) {
       window.localStorage.setItem('userName', user.profile.name);
@@ -117,33 +116,30 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     }
   };
 
-  const handleAddTransaction = (e: React.FormEvent) => {
+  const handleAddTransaction = async (e: React.FormEvent) => { // <-- Adicionado 'async'
     e.preventDefault();
-    
     if (!formData.description || !formData.amount) return;
-
-    const transactionData = {
-      ...formData,
-      date: currentPeriod + '-01'
-    };
-
-    const transaction = dataManager.addTransaction(transactionData);
+    
+    // Adicionado 'await' para esperar a confirmação do Firebase
+    const transaction = await dataManager.addTransaction({ ...formData, date: currentPeriod + '-01' });
     
     if (transaction) {
-      setFormData({
-        description: '',
-        amount: '',
-        type: 'expense',
-        category: 'Outros'
-      });
+      setFormData({ description: '', amount: '', type: 'expense', category: 'Outros' });
       updateSummary();
+    } else {
+      alert('Erro ao adicionar transação.');
     }
   };
 
-  const deleteTransaction = (transactionId: string) => {
+  const deleteTransaction = async (transactionId: string) => { // <-- Adicionado 'async'
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
-      if (dataManager.removeTransaction(transactionId)) {
+      
+      const success = await dataManager.removeTransaction(transactionId); // <-- Adicionado 'await'
+      
+      if (success) {
         updateSummary();
+      } else {
+        alert('Erro ao excluir transação.');
       }
     }
   };
@@ -152,11 +148,35 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
   setEditingIncome(true);
   setTempIncome(summary?.monthlyIncome?.toString() || '');
 };
-  const handleIncomeSave = () => {
+ const handleIncomeSave = async () => {
+    // Converte o valor do input (que é um texto) para um número.
+    // Se o texto estiver vazio ou for inválido, o valor será 0.
     const amount = parseFloat(tempIncome) || 0;
-    if (dataManager.setMonthlyIncome(currentPeriod, amount)) {
-      setEditingIncome(false);
-      updateSummary();
+    
+    // Chama a função do DataManager para salvar a nova renda de forma assíncrona.
+    // O 'await' faz o código esperar a operação terminar.
+    const success = await dataManager.setMonthlyIncome(currentPeriod, amount);
+    
+    // Verifica se a operação de salvar foi bem-sucedida.
+    if (success) {
+      setEditingIncome(false); // Volta para o modo de visualização (esconde o campo de edição).
+      updateSummary(); // Atualiza os dados exibidos na tela para refletir a nova renda.
+    } else {
+      // Se algo deu errado ao salvar, exibe um alerta para o usuário.
+      alert('Erro ao salvar a renda mensal.');
+    }
+  };
+
+const handleSubmit = async (e: React.FormEvent) => { // <-- Adicionado 'async'
+    // ... (lógica para criar dreamData)
+
+    const result = await dataManager.addDream(dreamData); // <-- Adicionado 'await'
+    
+    if (result) {
+      // ...
+      setShowAddModal(false);
+    } else {
+      alert('Erro ao adicionar sonho.');
     }
   };
 
@@ -213,282 +233,7 @@ const getAnnualIncome = () => {
 };
 // ...existing code...
 
-  // NOVA FUNCIONALIDADE: Exportação Abrangente
-  const handleComprehensiveExport = (format: 'pdf' | 'csv', dataType: string) => {
-    let exportData;
-    
-    switch (dataType) {
-      case 'all-transactions':
-        exportData = {
-          type: 'all-transactions',
-          transactions: dataManager.getAllTransactions(),
-          user: dataManager.getCurrentUser()?.profile
-        };
-        break;
-      case 'budgets':
-        exportData = {
-          type: 'budgets',
-          budgets: dataManager.getCategoryBudgets(),
-          user: dataManager.getCurrentUser()?.profile
-        };
-        break;
-      case 'dreams':
-        exportData = {
-          type: 'dreams',
-          dreams: dataManager.getDreams(),
-          user: dataManager.getCurrentUser()?.profile
-        };
-        break;
-      case 'complete':
-        exportData = dataManager.getExportData('all');
-        break;
-      default:
-        return;
-    }
 
-    if (format === 'csv') {
-      exportComprehensiveToCSV(exportData, dataType);
-    } else {
-      exportComprehensiveToPDF(exportData, dataType);
-    }
-    
-    setShowExportModal(false);
-  };
-
-  const exportComprehensiveToCSV = (data: any, dataType: string) => {
-    let csvContent = '';
-    let filename = '';
-
-    switch (dataType) {
-      case 'all-transactions':
-        if (!data.transactions || data.transactions.length === 0) {
-          alert('Não há transações para exportar.');
-          return;
-        }
-        const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
-        const rows = data.transactions.map((t: any) => [
-          t.date,
-          `"${t.description}"`,
-          `"${t.category}"`,
-          t.type === 'income' ? 'Receita' : 'Gasto',
-          t.amount.toFixed(2).replace('.', ',')
-        ]);
-        csvContent = [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
-        filename = 'orcamais-todas-transacoes.csv';
-        break;
-
-      case 'budgets':
-        if (!data.budgets || data.budgets.length === 0) {
-          alert('Não há orçamentos definidos para exportar.');
-          return;
-        }
-        const budgetHeaders = ['Categoria', 'Limite', 'Gasto', 'Porcentagem', 'Status'];
-        const budgetRows = data.budgets.map((b: any) => [
-          `"${b.category}"`,
-          b.limit.toFixed(2).replace('.', ','),
-          b.spent.toFixed(2).replace('.', ','),
-          b.percentage.toFixed(1).replace('.', ',') + '%',
-          b.status === 'ok' ? 'OK' : b.status === 'warning' ? 'Atenção' : 'Excedido'
-        ]);
-        csvContent = [budgetHeaders.join(';'), ...budgetRows.map(row => row.join(';'))].join('\n');
-        filename = 'orcamais-orcamentos.csv';
-        break;
-
-      case 'dreams':
-        if (!data.dreams || data.dreams.length === 0) {
-          alert('Não há sonhos cadastrados para exportar.');
-          return;
-        }
-        const dreamHeaders = ['Nome', 'Valor Total', 'Valor Economizado', 'Data Alvo', 'Valor Mensal'];
-        const dreamRows = data.dreams.map((d: any) => [
-          `"${d.name}"`,
-          d.totalValue.toFixed(2).replace('.', ','),
-          d.savedAmount.toFixed(2).replace('.', ','),
-          d.targetDate || 'Não definida',
-          d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'Não definido'
-        ]);
-        csvContent = [dreamHeaders.join(';'), ...dreamRows.map(row => row.join(';'))].join('\n');
-        filename = 'orcamais-sonhos.csv';
-        break;
-
-      case 'complete':
-        // Exportação completa com múltiplas seções
-        csvContent = 'ORCAMAIS - BACKUP COMPLETO\n\n';
-        
-        // Transações
-        csvContent += 'TRANSAÇÕES\n';
-        csvContent += 'Data;Descrição;Categoria;Tipo;Valor\n';
-        if (data.transactions) {
-          data.transactions.forEach((t: any) => {
-            csvContent += `${t.date};"${t.description}";"${t.category}";${t.type === 'income' ? 'Receita' : 'Gasto'};${t.amount.toFixed(2).replace('.', ',')}\n`;
-          });
-        }
-        
-        csvContent += '\n\nORÇAMENTOS\n';
-        csvContent += 'Categoria;Limite\n';
-        if (data.categoryBudgets) {
-          Object.entries(data.categoryBudgets).forEach(([category, limit]: [string, any]) => {
-            csvContent += `"${category}";${limit.toFixed(2).replace('.', ',')}\n`;
-          });
-        }
-        
-        csvContent += '\n\nSONHOS\n';
-        csvContent += 'Nome;Valor Total;Valor Economizado;Data Alvo;Valor Mensal\n';
-        if (data.dreams) {
-          data.dreams.forEach((d: any) => {
-            csvContent += `"${d.name}";${d.totalValue.toFixed(2).replace('.', ',')};${d.savedAmount.toFixed(2).replace('.', ',')};${d.targetDate || 'Não definida'};${d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'Não definido'}\n`;
-          });
-        }
-        
-        filename = 'orcamais-backup-completo.csv';
-        break;
-    }
-
-    // Adicionar BOM para UTF-8
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-  };
-
-  const exportComprehensiveToPDF = async (data: any, dataType: string) => {
-    try {
-      // Importar dinamicamente as bibliotecas
-      const jsPDF = (await import('jspdf')).default;
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      // Título
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('OrçaMais - Exportação de Dados', pageWidth / 2, 20, { align: 'center' });
-      
-      let yPosition = 35;
-      
-      switch (dataType) {
-        case 'all-transactions':
-          pdf.setFontSize(16);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('Todas as Transações', 20, yPosition);
-          yPosition += 10;
-          
-          if (data.transactions && data.transactions.length > 0) {
-            // Cabeçalho da tabela
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('Data', 20, yPosition);
-            pdf.text('Descrição', 40, yPosition);
-            pdf.text('Categoria', 100, yPosition);
-            pdf.text('Tipo', 140, yPosition);
-            pdf.text('Valor', 170, yPosition);
-            yPosition += 5;
-            
-            // Linha separadora
-            pdf.line(20, yPosition, pageWidth - 20, yPosition);
-            yPosition += 5;
-            
-            // Dados das transações
-            pdf.setFont('helvetica', 'normal');
-            data.transactions.forEach((t: any) => {
-              if (yPosition > pageHeight - 20) {
-                pdf.addPage();
-                yPosition = 20;
-              }
-              
-              pdf.text(t.date, 20, yPosition);
-              pdf.text(t.description.substring(0, 25), 40, yPosition);
-              pdf.text(t.category, 100, yPosition);
-              pdf.text(t.type === 'income' ? 'Receita' : 'Gasto', 140, yPosition);
-              pdf.text(formatCurrency(t.amount), 170, yPosition);
-              yPosition += 5;
-            });
-          } else {
-            pdf.setFont('helvetica', 'normal');
-            pdf.text('Nenhuma transação encontrada.', 20, yPosition);
-          }
-          break;
-
-        case 'budgets':
-          pdf.setFontSize(16);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('Orçamentos Definidos', 20, yPosition);
-          yPosition += 10;
-          
-          if (data.budgets && data.budgets.length > 0) {
-            data.budgets.forEach((budget: any) => {
-              if (yPosition > pageHeight - 20) {
-                pdf.addPage();
-                yPosition = 20;
-              }
-              
-              pdf.setFont('helvetica', 'bold');
-              pdf.text(`${budget.category}:`, 20, yPosition);
-              pdf.setFont('helvetica', 'normal');
-              pdf.text(`Limite: ${formatCurrency(budget.limit)}`, 30, yPosition + 5);
-              pdf.text(`Gasto: ${formatCurrency(budget.spent)} (${budget.percentage.toFixed(1)}%)`, 30, yPosition + 10);
-              pdf.text(`Status: ${budget.status === 'ok' ? 'OK' : budget.status === 'warning' ? 'Atenção' : 'Excedido'}`, 30, yPosition + 15);
-              yPosition += 25;
-            });
-          } else {
-            pdf.setFont('helvetica', 'normal');
-            pdf.text('Nenhum orçamento definido.', 20, yPosition);
-          }
-          break;
-
-        case 'dreams':
-          pdf.setFontSize(16);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('Sonhos Cadastrados', 20, yPosition);
-          yPosition += 10;
-          
-          if (data.dreams && data.dreams.length > 0) {
-            data.dreams.forEach((dream: any) => {
-              if (yPosition > pageHeight - 30) {
-                pdf.addPage();
-                yPosition = 20;
-              }
-              
-              pdf.setFont('helvetica', 'bold');
-              pdf.text(`${dream.name}:`, 20, yPosition);
-              pdf.setFont('helvetica', 'normal');
-              pdf.text(`Valor Total: ${formatCurrency(dream.totalValue)}`, 30, yPosition + 5);
-              pdf.text(`Economizado: ${formatCurrency(dream.savedAmount)}`, 30, yPosition + 10);
-              if (dream.targetDate) {
-                pdf.text(`Data Alvo: ${new Date(dream.targetDate).toLocaleDateString('pt-BR')}`, 30, yPosition + 15);
-              }
-              if (dream.monthlyAmount) {
-                pdf.text(`Valor Mensal: ${formatCurrency(dream.monthlyAmount)}`, 30, yPosition + 20);
-              }
-              yPosition += 30;
-            });
-          } else {
-            pdf.setFont('helvetica', 'normal');
-            pdf.text('Nenhum sonho cadastrado.', 20, yPosition);
-          }
-          break;
-      }
-      
-      // Rodapé
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 
-                pageWidth / 2, pageHeight - 10, { align: 'center' });
-      
-      const filename = dataType === 'all-transactions' ? 'orcamais-todas-transacoes.pdf' :
-                      dataType === 'budgets' ? 'orcamais-orcamentos.pdf' :
-                      dataType === 'dreams' ? 'orcamais-sonhos.pdf' :
-                      'orcamais-backup-completo.pdf';
-      
-      pdf.save(filename);
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF. Tente novamente.');
-    }
-  };
 
   if (!user || !summary) return <div className="text-center p-10">Carregando...</div>;
 
@@ -562,13 +307,11 @@ const getAnnualIncome = () => {
               </button>
 
               <button
-                onClick={() => setShowExportModal(true)}
+                onClick={() => onNavigate('investments')}
                 className="flex items-center justify-center px-4 py-2 min-w-[110px] bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium shadow-md transition"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Exportar</span>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                <span>Investimentos</span>
               </button>
 
               <button
@@ -1005,28 +748,20 @@ const getAnnualIncome = () => {
 </div>
 
 
-<<<<<<< HEAD
           </div>   
              <br/>
     <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
-=======
-
-          </div>   
-             <br/>
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
-    <h5 className="text-blue-500 dark:text-blue-light leading-tight break-words font-bold" style={{fontSize: "20px" ,textAlign: 'center'}}>Nova Transação</h5> 
->>>>>>> ac4ca1920c65a9f94c97d6cbdf1f92bba79d141f
           <br />
 
          
 
 
-<<<<<<< HEAD
-=======
+
+
          
 
 
->>>>>>> ac4ca1920c65a9f94c97d6cbdf1f92bba79d141f
+
           {/* Transaction Form */}
           <form onSubmit={handleAddTransaction} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1193,117 +928,7 @@ const getAnnualIncome = () => {
           </div>
         </div>
 
-        {/* Modal de Exportação Abrangente */}
-        {showExportModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-slate-800">Exportar Dados</h3>
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
 
-              <div className="space-y-6">
-                <p className="text-slate-600">
-                  Selecione o tipo de dados que deseja exportar:
-                </p>
-
-                {/* Todas as Transações */}
-                <div className="border border-slate-200 rounded-xl p-4">
-                  <h4 className="font-semibold text-slate-800 mb-2">📊 Todas as Transações</h4>
-                  <p className="text-sm text-slate-600 mb-3">Exportar todo o histórico de transações</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleComprehensiveExport('csv', 'all-transactions')}
-                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      CSV
-                    </button>
-                    <button
-                      onClick={() => handleComprehensiveExport('pdf', 'all-transactions')}
-                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                    >
-                      PDF
-                    </button>
-                  </div>
-                </div>
-
-                {/* Orçamentos */}
-                <div className="border border-slate-200 rounded-xl p-4">
-                  <h4 className="font-semibold text-slate-800 mb-2">💰 Orçamentos Definidos</h4>
-                  <p className="text-sm text-slate-600 mb-3">Exportar limites e status dos orçamentos</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleComprehensiveExport('csv', 'budgets')}
-                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      CSV
-                    </button>
-                    <button
-                      onClick={() => handleComprehensiveExport('pdf', 'budgets')}
-                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                    >
-                      PDF
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sonhos */}
-                <div className="border border-slate-200 rounded-xl p-4">
-                  <h4 className="font-semibold text-slate-800 mb-2">⭐ Sonhos Cadastrados</h4>
-                  <p className="text-sm text-slate-600 mb-3">Exportar metas e progresso dos sonhos</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleComprehensiveExport('csv', 'dreams')}
-                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      CSV
-                    </button>
-                    <button
-                      onClick={() => handleComprehensiveExport('pdf', 'dreams')}
-                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                    >
-                      PDF
-                    </button>
-                  </div>
-                </div>
-
-                {/* Backup Completo */}
-                <div className="border border-blue-200 rounded-xl p-4 bg-blue-50">
-                  <h4 className="font-semibold text-blue-800 mb-2">🔄 Backup Completo</h4>
-                  <p className="text-sm text-blue-700 mb-3">Exportar todos os dados em um único arquivo</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleComprehensiveExport('csv', 'complete')}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                    >
-                      CSV Completo
-                    </button>
-                    <button
-                      onClick={() => handleComprehensiveExport('pdf', 'complete')}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                    >
-                      PDF Completo
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="w-full px-4 py-3 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -11,11 +11,12 @@ import { AccessibilityEnhancedAuthScreen } from './components/AccessibilityEnhan
 import { AccessibilityEnhancedMainScreen } from './components/AccessibilityEnhancedMainScreen';
 import { SummaryScreen } from './components/SummaryScreen';
 import { DreamsScreen } from './components/DreamsScreen';
+import { InvestmentsScreen } from './components/InvestmentsScreen';
 
 // Import accessibility styles
 import './styles/accessibility.css';
 
-type AppScreen = 'loading' | 'landing' | 'auth' | 'main' | 'summary' | 'dreams';
+type AppScreen = 'loading' | 'landing' | 'auth' | 'main' | 'summary' | 'dreams' | 'investments';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('loading');
@@ -153,6 +154,9 @@ const App: React.FC = () => {
 
       case 'dreams':
         return <DreamsScreen onNavigate={handleNavigate} />;
+
+      case 'investments':
+        return <InvestmentsScreen onNavigate={handleNavigate} />;
 
       default:
         return <div>Tela não encontrada</div>;

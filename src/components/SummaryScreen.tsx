@@ -5,6 +5,7 @@
  * CORREÇÃO: Responsividade aprimorada e posicionamento correto da legenda dos gráficos
  */
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import dataManager from '../core/DataManager';
 import { 
@@ -17,11 +18,14 @@ import {
   getCategoryColor
 } from '../utils/formatters';
 
+
 interface SummaryScreenProps {
   onNavigate: (screen: string) => void;
 }
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
+  // Estado reativo para usuário
+  const [user, setUser] = useState<any>(null);
   const [currentPeriod, setCurrentPeriod] = useState(getCurrentPeriod());
   const [currentSummary, setCurrentSummary] = useState<any>(null);
   const [comparison, setComparison] = useState<any>(null);
@@ -29,14 +33,29 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
   const [budgetForm, setBudgetForm] = useState({ category: '', limit: '' });
   const [categoryBudgets, setCategoryBudgets] = useState<any[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
-
   const pieChartRef = useRef<HTMLCanvasElement>(null);
   const barChartRef = useRef<HTMLCanvasElement>(null);
 
+  // Escuta evento global de autenticação do Firebase
   useEffect(() => {
-    updateSummaryData();
-    updateBudgets();
-  }, [currentPeriod]);
+    // Escuta evento global de autenticação
+    const handleAuthChange = (event: any) => {
+      setUser(event.detail.user);
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    setUser(dataManager.getCurrentUser());
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+  }, []);
+
+  // Só carrega dados após user estar definido
+  useEffect(() => {
+    if (user) {
+      updateSummaryData();
+      updateBudgets();
+    }
+  }, [user, currentPeriod]);
 
   useEffect(() => {
     if (currentSummary) {
@@ -154,32 +173,25 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
     const legendCols = 2;
     const legendColWidth = rect.width / legendCols;
 
-    categories.forEach((category, index) => {
+    categories.forEach((cat, index) => {
       const col = index % legendCols;
       const row = Math.floor(index / legendCols);
       const x = col * legendColWidth + 20;
       const y = legendStartY + row * legendItemHeight;
-
-      // Desenhar quadrado colorido
       ctx.fillStyle = colors[index % colors.length];
       ctx.fillRect(x, y, 14, 14);
-
-      // Desenhar texto da categoria
       ctx.fillStyle = '#374151';
       ctx.font = '12px Inter, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      
-      // Truncar texto se for muito longo
       const maxWidth = legendColWidth - 40;
-      let text = category;
+      let text = cat;
       if (ctx.measureText(text).width > maxWidth) {
         while (ctx.measureText(text + '...').width > maxWidth && text.length > 0) {
           text = text.slice(0, -1);
         }
         text += '...';
       }
-      
       ctx.fillText(text, x + 20, y);
     });
   };
@@ -299,196 +311,269 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
     });
   };
 
-  // Gerenciar orçamentos
-  const handleBudgetSubmit = (e: React.FormEvent) => {
+  // Função de orçamento corrigida: async/await e verificação do resultado
+  const handleBudgetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!budgetForm.category || !budgetForm.limit) return;
-
     const limit = parseFloat(budgetForm.limit);
     if (limit <= 0) return;
-
-    dataManager.setCategoryBudget(budgetForm.category, limit);
-    updateBudgets();
-    setBudgetForm({ category: '', limit: '' });
-    setShowBudgetModal(false);
+    try {
+      const success = await dataManager.setCategoryBudget(budgetForm.category, limit);
+      if (success) {
+        updateBudgets();
+        setBudgetForm({ category: '', limit: '' });
+        setShowBudgetModal(false);
+      } else {
+        alert('Ocorreu um erro ao salvar o orçamento. Tente novamente.');
+      }
+    } catch (err) {
+      alert('Erro inesperado ao salvar orçamento.');
+    }
   };
 
-  // NOVA FUNCIONALIDADE: Exportar dados
-  const handleExport = (format: 'pdf' | 'csv') => {
-    const exportData = dataManager.getExportData('current', currentPeriod);
-    
-    if (format === 'csv') {
-      exportToCSV(exportData);
-    } else {
-      exportToPDF(exportData);
+  // Função de exportação completa
+  const handleComprehensiveExport = (format: 'pdf' | 'csv', dataType: string) => {
+    let exportData;
+    switch (dataType) {
+      case 'all-transactions':
+        exportData = {
+          type: 'all-transactions',
+          transactions: dataManager.getAllTransactions(),
+          user: dataManager.getCurrentUser()?.profile
+        };
+        break;
+      case 'budgets':
+        exportData = {
+          type: 'budgets',
+          budgets: dataManager.getCategoryBudgets(),
+          user: dataManager.getCurrentUser()?.profile
+        };
+        break;
+      case 'dreams':
+        exportData = {
+          type: 'dreams',
+          dreams: dataManager.getDreams(),
+          user: dataManager.getCurrentUser()?.profile
+        };
+        break;
+      case 'complete':
+        exportData = dataManager.getExportData('all');
+        break;
+      default:
+        return;
     }
-    
+    if (format === 'csv') {
+      exportComprehensiveToCSV(exportData, dataType);
+    } else {
+      exportComprehensiveToPDF(exportData, dataType);
+    }
     setShowExportModal(false);
   };
 
-  const exportToCSV = (data: any) => {
-    if (!data.transactions || data.transactions.length === 0) {
-      alert('Não há transações para exportar neste período.');
-      return;
-    }
-
-    // Obter nome do usuário do localStorage ou fallback
-    let userName = '';
-    if (window && window.localStorage && window.localStorage.getItem('userName')) {
-      userName = window.localStorage.getItem('userName') || '';
-    }
-    if (!userName) {
-      // @ts-ignore
-      userName = (window.navigator && window.navigator.userName) || '';
-    }
-    if (!userName) {
-      userName = 'usuário';
-    }
-
-    // Saudação personalizada
-    const saudacao = `Olá, ${userName}! Seu relatório detalhado do mês ${formatPeriod(data.period)} está pronto.`;
-
-    const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
-    const rows = data.transactions.map((t: any) => [
-      t.date,
-      `"${t.description}"`,
-      `"${t.category}"`,
-      t.type === 'income' ? 'Receita' : 'Gasto',
-      t.amount.toFixed(2).replace('.', ',')
-    ]);
-
-    // Adiciona a saudação como primeira linha, depois o cabeçalho e os dados
-    const csvContent = [saudacao, headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
-
-    // Adicionar BOM para UTF-8
+  // Função completa de exportação para CSV
+  const exportComprehensiveToCSV = (data: any, dataType: string) => {
+    let csvContent = '';
+    let filename = '';
     const BOM = '\uFEFF';
+    const userName = data?.user?.name || 'usuário';
+    const saudacao = `Olá, ${userName}! Seu relatório foi gerado.\n\n`;
+    csvContent += saudacao;
+    switch (dataType) {
+      case 'all-transactions': {
+        if (!data.transactions || data.transactions.length === 0) { alert('Não há transações para exportar.'); return; }
+        const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
+        const rows = data.transactions.map((t: any) => [ t.date, `"${t.description}"`, `"${t.category}"`, t.type === 'income' ? 'Receita' : 'Gasto', t.amount.toFixed(2).replace('.', ',') ]);
+  csvContent += [headers.join(';'), ...rows.map((row: string[]) => row.join(';'))].join('\n');
+        filename = 'orcamais-todas-transacoes.csv';
+        break;
+      }
+      case 'budgets': {
+        if (!data.budgets || data.budgets.length === 0) { alert('Não há orçamentos para exportar.'); return; }
+        const budgetHeaders = ['Categoria', 'Limite', 'Gasto', 'Porcentagem', 'Status'];
+        const budgetRows = data.budgets.map((b: any) => [ `"${b.category}"`, b.limit.toFixed(2).replace('.', ','), b.spent.toFixed(2).replace('.', ','), b.percentage.toFixed(1).replace('.', ',') + '%', b.status ]);
+  csvContent += [budgetHeaders.join(';'), ...budgetRows.map((row: string[]) => row.join(';'))].join('\n');
+        filename = 'orcamais-orcamentos.csv';
+        break;
+      }
+      case 'dreams': {
+        if (!data.dreams || data.dreams.length === 0) { alert('Não há sonhos para exportar.'); return; }
+        const dreamHeaders = ['Nome', 'Valor Total', 'Economizado', 'Data Alvo', 'Valor Mensal'];
+        const dreamRows = data.dreams.map((d: any) => [ `"${d.name}"`, d.totalValue.toFixed(2).replace('.', ','), d.savedAmount.toFixed(2).replace('.', ','), d.targetDate || 'N/A', d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'N/A' ]);
+  csvContent += [dreamHeaders.join(';'), ...dreamRows.map((row: string[]) => row.join(';'))].join('\n');
+        filename = 'orcamais-sonhos.csv';
+        break;
+      }
+      case 'complete': {
+        csvContent += 'ORCAMAIS - BACKUP COMPLETO\n\nTRANSAÇÕES\nData;Descrição;Categoria;Tipo;Valor\n';
+        data.transactions?.forEach((t: any) => { csvContent += `${t.date};"${t.description}";"${t.category}";${t.type === 'income' ? 'Receita' : 'Gasto'};${t.amount.toFixed(2).replace('.', ',')}\n`; });
+        csvContent += '\n\nORÇAMENTOS\nCategoria;Limite\n';
+        Object.entries(data.categoryBudgets ?? {})?.forEach(([cat, lim]: [string, any]) => { csvContent += `"${cat}";${lim.toFixed(2).replace('.', ',')}\n`; });
+        csvContent += '\n\nSONHOS\nNome;Valor Total;Economizado;Data Alvo;Valor Mensal\n';
+        data.dreams?.forEach((d: any) => { csvContent += `"${d.name}";${d.totalValue.toFixed(2).replace('.', ',')};${d.savedAmount.toFixed(2).replace('.', ',')};${d.targetDate || 'N/A'};${d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'N/A'}\n`; });
+        filename = 'orcamais-backup-completo.csv';
+        break;
+      }
+      default:
+        alert('Tipo de exportação inválido.');
+        return;
+    }
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `orcamais-${data.period}.csv`;
+    link.download = filename;
     link.click();
   };
 
-  const exportToPDF = async (data: any) => {
+  // Função completa de exportação para PDF
+  const exportComprehensiveToPDF = async (data: any, dataType: string) => {
     try {
-      // Importar dinamicamente as bibliotecas
       const jsPDF = (await import('jspdf')).default;
-      const html2canvas = (await import('html2canvas')).default;
-
-      // Obter nome do usuário do navegador ou de um campo, fallback para 'usuário'
-      let userName = '';
-      if (window && window.localStorage && window.localStorage.getItem('userName')) {
-        userName = window.localStorage.getItem('userName') || '';
-      }
-      if (!userName) {
-        // Tenta pegar do sistema operacional (apenas navegadores que suportam)
-        // @ts-ignore
-        userName = (window.navigator && window.navigator.userName) || '';
-      }
-      if (!userName) {
-        userName = 'usuário';
-      }
-
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-
-      // Saudação personalizada
+      const userName = data?.user?.name || 'usuário';
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
       pdf.text(`Olá, ${userName}!`, 20, 18);
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Seu relatório detalhado do mês ${formatPeriod(data.period)} está pronto.`, 20, 26);
-
-      // Título
+      pdf.text(`Seu relatório está pronto.`, 20, 26);
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('OrçaMais - Relatório Financeiro', pageWidth / 2, 38, { align: 'center' });
-
-      // Período
-      pdf.setFontSize(14);
+      pdf.text('OrçaMais - Exportação de Dados', pageWidth / 2, 38, { align: 'center' });
+      let yPosition = 55;
+      pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Período: ${formatPeriod(data.period)}`, pageWidth / 2, 48, { align: 'center' });
-
-      let yPosition = 63;
-
-      // Resumo Financeiro
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Resumo Financeiro', 20, yPosition);
-      yPosition += 10;
-
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Renda Mensal: ${formatCurrency(data.summary.monthlyIncome)}`, 20, yPosition);
-      yPosition += 7;
-      pdf.text(`Total de Receitas: ${formatCurrency(data.summary.totalIncome)}`, 20, yPosition);
-      yPosition += 7;
-      pdf.text(`Total de Gastos: ${formatCurrency(data.summary.totalExpenses)}`, 20, yPosition);
-      yPosition += 7;
-      pdf.text(`Saldo: ${formatCurrency(data.summary.balance)}`, 20, yPosition);
-      yPosition += 15;
-
-      // Transações
-      if (data.transactions && data.transactions.length > 0) {
-        pdf.setFontSize(16);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Transações', 20, yPosition);
-        yPosition += 10;
-
-        // Cabeçalho da tabela
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Data', 20, yPosition);
-        pdf.text('Descrição', 40, yPosition);
-        pdf.text('Categoria', 100, yPosition);
-        pdf.text('Tipo', 140, yPosition);
-        pdf.text('Valor', 170, yPosition);
-        yPosition += 5;
-
-        // Linha separadora
-        pdf.line(20, yPosition, pageWidth - 20, yPosition);
-        yPosition += 5;
-
-        // Dados das transações
-        pdf.setFont('helvetica', 'normal');
-        data.transactions.slice(0, 30).forEach((t: any) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
+      switch (dataType) {
+        case 'all-transactions': {
+          pdf.text('Todas as Transações', 20, yPosition);
+          yPosition += 8;
+          if (!data.transactions || data.transactions.length === 0) {
+            pdf.text('Não há transações para exportar.', 20, yPosition);
+            break;
           }
-
-          pdf.text(t.date, 20, yPosition);
-          pdf.text(t.description.substring(0, 25), 40, yPosition);
-          pdf.text(t.category, 100, yPosition);
-          pdf.text(t.type === 'income' ? 'Receita' : 'Gasto', 140, yPosition);
-          pdf.text(formatCurrency(t.amount), 170, yPosition);
-          yPosition += 5;
-        });
-
-        if (data.transactions.length > 30) {
-          yPosition += 5;
-          pdf.setFont('helvetica', 'italic');
-          pdf.text(`... e mais ${data.transactions.length - 30} transações`, 20, yPosition);
+          const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(headers.join(' | '), 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          data.transactions.forEach((t: any) => {
+            const row = [t.date, t.description, t.category, t.type === 'income' ? 'Receita' : 'Gasto', t.amount.toFixed(2).replace('.', ',')].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          break;
         }
+        case 'budgets': {
+          pdf.text('Orçamentos Definidos', 20, yPosition);
+          yPosition += 8;
+          if (!data.budgets || data.budgets.length === 0) {
+            pdf.text('Não há orçamentos para exportar.', 20, yPosition);
+            break;
+          }
+          const budgetHeaders = ['Categoria', 'Limite', 'Gasto', 'Porcentagem', 'Status'];
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(budgetHeaders.join(' | '), 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          data.budgets.forEach((b: any) => {
+            const row = [b.category, b.limit.toFixed(2).replace('.', ','), b.spent.toFixed(2).replace('.', ','), b.percentage.toFixed(1).replace('.', ',') + '%', b.status].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          break;
+        }
+        case 'dreams': {
+          pdf.text('Sonhos Cadastrados', 20, yPosition);
+          yPosition += 8;
+          if (!data.dreams || data.dreams.length === 0) {
+            pdf.text('Não há sonhos para exportar.', 20, yPosition);
+            break;
+          }
+          const dreamHeaders = ['Nome', 'Valor Total', 'Economizado', 'Data Alvo', 'Valor Mensal'];
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(dreamHeaders.join(' | '), 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          data.dreams.forEach((d: any) => {
+            const row = [d.name, d.totalValue.toFixed(2).replace('.', ','), d.savedAmount.toFixed(2).replace('.', ','), d.targetDate || 'N/A', d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'N/A'].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          break;
+        }
+        case 'complete': {
+          pdf.text('Backup Completo', 20, yPosition);
+          yPosition += 8;
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('TRANSAÇÕES', 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          data.transactions?.forEach((t: any) => {
+            const row = [t.date, t.description, t.category, t.type === 'income' ? 'Receita' : 'Gasto', t.amount.toFixed(2).replace('.', ',')].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          yPosition += 8;
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('ORÇAMENTOS', 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          Object.entries(data.categoryBudgets ?? {})?.forEach(([cat, lim]: [string, any]) => {
+            const row = [cat, lim.toFixed(2).replace('.', ',')].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          yPosition += 8;
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('SONHOS', 20, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          yPosition += 7;
+          data.dreams?.forEach((d: any) => {
+            const row = [d.name, d.totalValue.toFixed(2).replace('.', ','), d.savedAmount.toFixed(2).replace('.', ','), d.targetDate || 'N/A', d.monthlyAmount ? d.monthlyAmount.toFixed(2).replace('.', ',') : 'N/A'].join(' | ');
+            pdf.text(row, 20, yPosition);
+            yPosition += 6;
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+          });
+          break;
+        }
+        default:
+          pdf.text('Tipo de exportação inválido.', 20, yPosition);
       }
-
-      // Rodapé
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 
-                pageWidth / 2, pageHeight - 10, { align: 'center' });
-
-      pdf.save(`orcamais-${data.period}.pdf`);
+      pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.save(`orcamais-${dataType}.pdf`);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar PDF. Tente novamente.');
     }
   };
 
-  if (!currentSummary) return <div>Carregando...</div>;
+  if (!user || !currentSummary) return <div>Carregando...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-2 sm:p-4">
@@ -851,56 +936,68 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
         )}
 
         {/* Modal de Exportação com responsividade melhorada */}
+       {/* ▼▼▼ COLE O NOVO MODAL AVANÇADO AQUI ▼▼▼ */}
         {showExportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-4 sm:p-6 lg:p-8 max-w-md w-full">
-              <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-800">Exportar Dados</h3>
+            <div className="bg-white rounded-3xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Exportar Dados</h3>
                 <button
                   onClick={() => setShowExportModal(false)}
                   className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
                 >
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                   </svg>
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <p className="text-slate-600 text-sm sm:text-base">
-                  Exportar dados do período: <strong>{formatPeriod(currentPeriod)}</strong>
+              <div className="space-y-6">
+                <p className="text-slate-600">
+                  Selecione o tipo de dados que deseja exportar:
                 </p>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleExport('csv')}
-                    className="flex flex-col items-center p-3 sm:p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                  >
-                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <span className="font-semibold text-sm sm:text-base">Excel/CSV</span>
-                    <span className="text-xs text-slate-500">Planilha</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    className="flex flex-col items-center p-3 sm:p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                  >
-                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <span className="font-semibold text-sm sm:text-base">PDF</span>
-                    <span className="text-xs text-slate-500">Documento</span>
-                  </button>
+                {/* Todas as Transações */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-800 mb-2">📊 Todas as Transações</h4>
+                  <p className="text-sm text-slate-600 mb-3">Exportar todo o histórico de transações</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleComprehensiveExport('csv', 'all-transactions')} className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">CSV</button>
+                    <button onClick={() => handleComprehensiveExport('pdf', 'all-transactions')} className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">PDF</button>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="w-full px-4 py-3 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors mt-4 text-sm sm:text-base font-medium"
-                >
-                  Cancelar
-                </button>
+                {/* Orçamentos */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-800 mb-2">💰 Orçamentos Definidos</h4>
+                  <p className="text-sm text-slate-600 mb-3">Exportar limites e status dos orçamentos</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleComprehensiveExport('csv', 'budgets')} className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">CSV</button>
+                    <button onClick={() => handleComprehensiveExport('pdf', 'budgets')} className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">PDF</button>
+                  </div>
+                </div>
+
+                {/* Sonhos */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-800 mb-2">⭐ Sonhos Cadastrados</h4>
+                  <p className="text-sm text-slate-600 mb-3">Exportar metas e progresso dos sonhos</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleComprehensiveExport('csv', 'dreams')} className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">CSV</button>
+                    <button onClick={() => handleComprehensiveExport('pdf', 'dreams')} className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">PDF</button>
+                  </div>
+                </div>
+                
+                {/* Backup Completo */}
+                <div className="border border-blue-200 rounded-xl p-4 bg-blue-50">
+                  <h4 className="font-semibold text-blue-800 mb-2">🔄 Backup Completo</h4>
+                  <p className="text-sm text-blue-700 mb-3">Exportar todos os dados em um único arquivo</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleComprehensiveExport('csv', 'complete')} className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">CSV Completo</button>
+                    <button onClick={() => handleComprehensiveExport('pdf', 'complete')} className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">PDF Completo</button>
+                  </div>
+                </div>
+
+                <button onClick={() => setShowExportModal(false)} className="w-full px-4 py-3 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium">Cancelar</button>
               </div>
             </div>
           </div>
