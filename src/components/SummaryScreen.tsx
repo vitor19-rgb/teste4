@@ -666,67 +666,67 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
               <h3 className="text-xs sm:text-sm font-semibold text-blue-800 mb-1 sm:mb-2">Renda Mensal</h3>
               <p className="text-sm sm:text-lg lg:text-2xl font-bold text-blue-900">{formatCurrency(currentSummary.monthlyIncome)}</p>
             </div>
+{/* Total de Receitas */}
+<div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border border-emerald-100 hover:shadow-2xl transition-all duration-300">
+  <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-emerald-600 to-green-700 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg">
+    <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+    </svg>
+  </div>
+  <h3 className="text-xs sm:text-sm font-semibold text-emerald-800 mb-1 sm:mb-2">Total de Receitas</h3>
+  <p className="text-sm sm:text-lg lg:text-2xl font-bold text-emerald-900">{formatCurrency(currentSummary.totalIncome)}</p>
+  {comparison && (
+    <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.incomeChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+      {formatPercentage(comparison.comparison.incomeChangePercent).replace('+', '')} vs anterior
+    </p>
+  )}
+</div>
 
-            {/* Total de Receitas */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border border-emerald-100 hover:shadow-2xl transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-emerald-600 to-green-700 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                </svg>
-              </div>
-              <h3 className="text-xs sm:text-sm font-semibold text-emerald-800 mb-1 sm:mb-2">Total de Receitas</h3>
-              <p className="text-sm sm:text-lg lg:text-2xl font-bold text-emerald-900">{formatCurrency(currentSummary.totalIncome)}</p>
-              {comparison && (
-                <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.incomeChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {formatPercentage(comparison.comparison.incomeChangePercent)} vs anterior
-                </p>
-              )}
-            </div>
+{/* Total de Gastos */}
+<div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border border-red-100 hover:shadow-2xl transition-all duration-300">
+  <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-red-600 to-pink-700 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg">
+    <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+    </svg>
+  </div>
+  <h3 className="text-xs sm:text-sm font-semibold text-red-800 mb-1 sm:mb-2">Total de Gastos</h3>
+  <p className="text-sm sm:text-lg lg:text-2xl font-bold text-red-900">{formatCurrency(currentSummary.totalExpenses)}</p>
+  {comparison && (
+    <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.expenseChange <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+      {formatPercentage(comparison.comparison.expenseChangePercent).replace('+', '')} vs anterior
+    </p>
+  )}
+</div>
 
-            {/* Total de Gastos */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border border-red-100 hover:shadow-2xl transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-red-600 to-pink-700 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                </svg>
-              </div>
-              <h3 className="text-xs sm:text-sm font-semibold text-red-800 mb-1 sm:mb-2">Total de Gastos</h3>
-              <p className="text-sm sm:text-lg lg:text-2xl font-bold text-red-900">{formatCurrency(currentSummary.totalExpenses)}</p>
-              {comparison && (
-                <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.expenseChange <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {formatPercentage(comparison.comparison.expenseChangePercent)} vs anterior
-                </p>
-              )}
-            </div>
-
-            {/* Saldo */}
-            <div className={`bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border hover:shadow-2xl transition-all duration-300 ${
-              currentSummary.balance >= 0 ? 'border-blue-100' : 'border-red-100'
-            }`}>
-              <div className={`inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg ${
-                currentSummary.balance >= 0 
-                  ? 'bg-gradient-to-br from-blue-600 to-indigo-700' 
-                  : 'bg-gradient-to-br from-red-600 to-pink-700'
-              }`}>
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                </svg>
-              </div>
-              <h3 className={`text-xs sm:text-sm font-semibold mb-1 sm:mb-2 ${
-                currentSummary.balance >= 0 ? 'text-blue-800' : 'text-red-800'
-              }`}>Saldo</h3>
-           <p className={`text-sm sm:text-lg lg:text-2xl font-bold ${
-  currentSummary.balance >= 0 ? 'text-blue-900' : 'text-red-900'
+{/* Saldo */}
+<div className={`bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl p-3 sm:p-4 lg:p-6 text-center border hover:shadow-2xl transition-all duration-300 ${
+  currentSummary.balance >= 0 ? 'border-blue-100' : 'border-red-100'
 }`}>
-  {`R$ ${currentSummary.balance < 0 ? '-' : ''}${formatCurrency(Math.abs(currentSummary.balance)).replace('R$', '').trim()}`}
-</p>
+  <div className={`inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl mb-2 sm:mb-3 lg:mb-4 shadow-lg ${
+    currentSummary.balance >= 0 
+      ? 'bg-gradient-to-br from-blue-600 to-indigo-700' 
+      : 'bg-gradient-to-br from-red-600 to-pink-700'
+  }`}>
+    <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+    </svg>
+  </div>
+  <h3 className={`text-xs sm:text-sm font-semibold mb-1 sm:mb-2 ${
+    currentSummary.balance >= 0 ? 'text-blue-800' : 'text-red-800'
+  }`}>Saldo</h3>
+  <p className={`text-sm sm:text-lg lg:text-2xl font-bold ${
+    currentSummary.balance >= 0 ? 'text-blue-900' : 'text-red-900'
+  }`}>
+    {`R$ ${currentSummary.balance < 0 ? '-' : ''}${formatCurrency(Math.abs(currentSummary.balance)).replace('R$', '').trim()}`}
+  </p>
 
-              {comparison && (
-                <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.balanceChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {comparison.comparison.balanceChange >= 0 ? '+' : ''}{formatCurrency(comparison.comparison.balanceChange)} vs anterior
-                </p>
-              )}
-            </div>
+  {comparison && (
+    <p className={`text-xs sm:text-sm mt-1 ${comparison.comparison.balanceChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+      {formatCurrency(comparison.comparison.balanceChange)} vs anterior
+    </p>
+  )}
+</div>
+
           </div>
         </div>
 

@@ -1,18 +1,41 @@
 /**
  * Accessibility Enhanced AuthScreen
  * Design profissional corporativo com WCAG 2.1 compliance
- * VERSÃO CORRIGIDA COM ASYNC/AWAIT
+ *
+ * VERSÃO ATUALIZADA:
+ * - Mantém 100% do CSS/HTML e funções de acessibilidade originais.
+ * - Adiciona o link "Esqueceu a senha?" (Passo 3).
+ * - Integra login/cadastro com Firebase (Passo 4).
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import dataManager from '../core/DataManager';
+// import dataManager from '../core/DataManager'; // Removido
 import { validateEmail, validatePassword } from '../utils/formatters';
 
+// --- INÍCIO DA MODIFICAÇÃO (NOVOS IMPORTS) ---
+import { auth } from '../core/firebaseConfig'; // Importamos a config do Firebase
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile // Usado para salvar o NOME do usuário no Firebase
+} from 'firebase/auth';
+// --- FIM DA MODIFICAÇÃO ---
+
+
+// --- INÍCIO DA MODIFICAÇÃO 1 (Props) ---
+// Adicionamos 'onNavigate' para o "Esqueceu a senha?"
 interface AuthScreenProps {
   onAuthSuccess: (userData: any) => void;
+  onNavigate: (screen: 'forgotPassword' | string) => void; // Prop do Passo 3
 }
 
-export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
+// Recebemos 'onNavigate'
+export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ 
+  onAuthSuccess, 
+  onNavigate 
+}) => {
+// --- FIM DA MODIFICAÇÃO 1 ---
+
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,11 +47,15 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
     email: '',
     password: ''
   });
+  
+  // --- INÍCIO DA MODIFICAÇÃO (Novo Estado) ---
+  const [isLoading, setIsLoading] = useState(false); // Para desativar botões
+  // --- FIM DA MODIFICAÇÃO ---
 
   const formRef = useRef<HTMLFormElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus management
+  // Suas funções originais (mantidas)
   useEffect(() => {
     if (firstInputRef.current) {
       firstInputRef.current.focus();
@@ -52,7 +79,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
     }, 1000);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => { // <-- ADICIONADO ASYNC
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearErrors();
 
@@ -64,7 +91,8 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
       hasErrors = true;
     }
 
-    if (!validatePassword(formData.password)) {
+    // Modificação: A validação de senha só deve ocorrer no cadastro
+    if (!isLoginMode && !validatePassword(formData.password)) {
       newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
       hasErrors = true;
     }
@@ -91,51 +119,91 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
       return;
     }
 
-    if (isLoginMode) {
-      await handleLogin(); // <-- ADICIONADO AWAIT
-    } else {
-      await handleRegister(); // <-- ADICIONADO AWAIT
-    }
-  };
-
-  // ▼▼▼ FUNÇÃO CORRIGIDA ▼▼▼
-  const handleLogin = async () => { // <-- ADICIONADO ASYNC
-    const result = await dataManager.loginUser(formData.email, formData.password); // <-- ADICIONADO AWAIT
+    // --- INÍCIO DA MODIFICAÇÃO ---
+    setIsLoading(true); // Ativa o loading
+    // --- FIM DA MODIFICAÇÃO ---
     
-    if (result.success) {
+    if (isLoginMode) {
+      await handleLogin();
+    } else {
+      await handleRegister();
+    }
+  };
+
+  // --- INÍCIO DA MODIFICAÇÃO 2: handleLogin com Firebase (Passo 4) ---
+  const handleLogin = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      
+      // Sucesso
+      setIsLoading(false);
       announceError('Login realizado com sucesso');
-      onAuthSuccess(result.user);
-    } else {
-        setErrors({ ...errors, email: result.message || 'Usuário ou senha inválidos' });
-        announceError(`Erro ao fazer login: ${result.message || 'Usuário ou senha inválidos'}`);
+      onAuthSuccess(userCredential.user);
+
+    } catch (error: any) {
+      // Erro
+      setIsLoading(false);
+      let message = 'Erro ao fazer login.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        message = 'Email ou senha inválidos.';
+      }
+      setErrors({ ...errors, email: message });
+      announceError(`Erro ao fazer login: ${message}`);
     }
   };
+  // --- FIM DA MODIFICAÇÃO 2 ---
 
-  // ▼▼▼ FUNÇÃO CORRIGIDA ▼▼▼
-  const handleRegister = async () => { // <-- ADICIONADO ASYNC
-    const result = await dataManager.registerUser({ // <-- ADICIONADO AWAIT
-      name: formData.name,
-      email: formData.email,
-      password: formData.password
-    });
+  // --- INÍCIO DA MODIFICAÇÃO 3: handleRegister com Firebase (Passo 4) ---
+  const handleRegister = async () => {
+    try {
+      // 1. Criamos o usuário
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
 
-    if (result.success) {
+      // 2. Atualizamos o perfil dele com o NOME
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, {
+          displayName: formData.name
+        });
+      }
+
+      // Sucesso
+      setIsLoading(false);
       announceError('Conta criada com sucesso');
-      onAuthSuccess(result.user);
-    } else {
-      setErrors({ ...errors, email: result.message });
-      announceError(`Erro ao criar conta: ${result.message}`);
+      onAuthSuccess({ ...userCredential.user, displayName: formData.name });
+
+    } catch (error: any) {
+      // Erro
+      setIsLoading(false);
+      let message = 'Erro ao criar conta.';
+      if (error.code === 'auth/email-already-in-use') {
+        message = 'Este email já está sendo usado.';
+      } else if (error.code === 'auth/weak-password') {
+        message = 'A senha é muito fraca.';
+      }
+      setErrors({ ...errors, email: message });
+      announceError(`Erro ao criar conta: ${message}`);
     }
   };
+  // --- FIM DA MODIFICAÇÃO 3 ---
 
+
+  // Função original
   const handleModeToggle = () => {
     setIsLoginMode(!isLoginMode);
     clearErrors();
     announceError(isLoginMode ? 'Modo de cadastro ativado' : 'Modo de login ativado');
   };
 
+  // --- O JSX abaixo é o seu original, com 'disabled' e o novo link ---
   return (
-    // ... O RESTO DO SEU CÓDIGO JSX PERMANECE O MESMO ...
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
@@ -193,12 +261,13 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                       name="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
                       placeholder="Digite seu nome completo"
                       maxLength={50}
                       aria-invalid={errors.name ? 'true' : 'false'}
                       aria-describedby={errors.name ? 'name-error' : undefined}
                       autoComplete="name"
+                      disabled={isLoading} // <-- MODIFICAÇÃO
                     />
                     {errors.name && (
                       <div 
@@ -231,13 +300,14 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     name="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
                     placeholder="Digite seu email"
                     maxLength={70}
                     required
                     aria-invalid={errors.email ? 'true' : 'false'}
                     aria-describedby={errors.email ? 'email-error' : undefined}
                     autoComplete="email"
+                    disabled={isLoading} // <-- MODIFICAÇÃO
                   />
                   {errors.email && (
                     <div 
@@ -268,13 +338,14 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                     name="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
                     placeholder="Digite sua senha"
                     maxLength={50}
                     required
                     aria-invalid={errors.password ? 'true' : 'false'}
                     aria-describedby={errors.password ? 'password-error password-help' : 'password-help'}
                     autoComplete={isLoginMode ? 'current-password' : 'new-password'}
+                    disabled={isLoading} // <-- MODIFICAÇÃO
                   />
                   {errors.password && (
                     <div 
@@ -299,13 +370,31 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                   )}
                 </div>
 
+                {/* --- INÍCIO DA MODIFICAÇÃO 4 (Link "Esqueceu a senha?") --- */}
+                {isLoginMode && (
+                  <div className="text-right text-sm">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('forgotPassword')}
+                      className="font-semibold text-blue-300 hover:text-white underline transition-colors duration-300 disabled:opacity-50"
+                      disabled={isLoading}
+                    >
+                      Esqueceu sua senha?
+                    </button>
+                  </div>
+                )}
+                {/* --- FIM DA MODIFICAÇÃO 4 --- */}
+
+
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] transform"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] transform disabled:opacity-75 disabled:scale-100"
                   aria-describedby="submit-help"
+                  disabled={isLoading} // <-- MODIFICAÇÃO
                 >
-                  {isLoginMode ? 'Acessar Plataforma' : 'Criar Conta Profissional'}
+                  {/* --- MODIFICAÇÃO (Texto do botão) --- */}
+                  {isLoading ? 'Carregando...' : (isLoginMode ? 'Acessar Plataforma' : 'Criar Conta Profissional')}
                 </button>
                 <div id="submit-help" className="sr-only">
                   {isLoginMode ? 'Clique para fazer login' : 'Clique para criar sua conta'}
@@ -319,22 +408,17 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ onA
                   <button
                     type="button"
                     onClick={handleModeToggle}
-                    className="text-blue-300 hover:text-white font-semibold ml-2 underline transition-colors duration-300"
+                    className="text-blue-300 hover:text-white font-semibold ml-2 underline transition-colors duration-300 disabled:opacity-50"
                     aria-label={isLoginMode ? 'Alternar para modo de cadastro' : 'Alternar para modo de login'}
+                    disabled={isLoading} // <-- MODIFICAÇÃO
                   >
                     {isLoginMode ? 'Criar conta profissional' : 'Fazer login'}
                   </button>
                 </p>
               </div>
 
-              {/* Demo Info */}
-              {isLoginMode && (
-                <div className="mt-6 p-4 bg-blue-500/20 backdrop-blur-sm rounded-xl border border-blue-400/30">
-                  <p className="text-blue-100 text-sm text-center">
-                    <span className="font-semibold">🚀 Versão Demo:</span> Use qualquer email/senha para explorar a plataforma
-                  </p>
-                </div>
-              )}
+              {/* Demo Info - REMOVIDO, pois agora é um login real com Firebase */}
+              
             </main>
           </div>
         </div>

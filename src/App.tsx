@@ -13,10 +13,18 @@ import { SummaryScreen } from './components/SummaryScreen';
 import { DreamsScreen } from './components/DreamsScreen';
 import { InvestmentsScreen } from './components/InvestmentsScreen';
 
+// --- INÍCIO DA MODIFICAÇÃO 1 ---
+// Importamos a nova tela de redefinição de senha que criamos no Passo 1
+import { ForgotPasswordScreen } from './components/ForgotPasswordScreen';
+// --- FIM DA MODIFICAÇÃO 1 ---
+
 // Import accessibility styles
 import './styles/accessibility.css';
 
-type AppScreen = 'loading' | 'landing' | 'auth' | 'main' | 'summary' | 'dreams' | 'investments';
+// --- INÍCIO DA MODIFICAÇÃO 2 ---
+// Adicionamos 'forgotPassword' aos tipos de tela possíveis
+type AppScreen = 'loading' | 'landing' | 'auth' | 'main' | 'summary' | 'dreams' | 'investments' | 'forgotPassword';
+// --- FIM DA MODIFICAÇÃO 2 ---
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('loading');
@@ -55,6 +63,7 @@ const App: React.FC = () => {
     setCurrentScreen('main');
   };
 
+  // Esta função agora aceita 'forgotPassword' como um valor válido
   const handleNavigate = (screen: AppScreen) => {
     setCurrentScreen(screen);
   };
@@ -62,6 +71,7 @@ const App: React.FC = () => {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'loading':
+        // (Seu código da tela de loading original - sem alterações)
         const backgroundPatternSvg = "data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
         
         return (
@@ -144,7 +154,20 @@ const App: React.FC = () => {
         return <LandingScreen onGetStarted={handleGetStarted} />;
 
       case 'auth':
-        return <AccessibilityEnhancedAuthScreen onAuthSuccess={handleAuthSuccess} />;
+        // --- INÍCIO DA MODIFICAÇÃO 3 ---
+        // Passamos a função 'handleNavigate' para a tela de autenticação
+        // para que ela possa nos enviar para a tela 'forgotPassword'
+        return <AccessibilityEnhancedAuthScreen 
+                  onAuthSuccess={handleAuthSuccess} 
+                  onNavigate={handleNavigate} 
+               />;
+        // --- FIM DA MODIFICAÇÃO 3 ---
+
+      // --- INÍCIO DA MODIFICAÇÃO 4 ---
+      // Adicionamos um novo 'case' para renderizar a tela de redefinição
+      case 'forgotPassword':
+        return <ForgotPasswordScreen onNavigate={handleNavigate} />;
+      // --- FIM DA MODIFICAÇÃO 4 ---
 
       case 'main':
         return <AccessibilityEnhancedMainScreen onNavigate={handleNavigate} />;
@@ -171,4 +194,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
