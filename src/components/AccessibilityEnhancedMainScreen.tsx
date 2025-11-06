@@ -56,8 +56,13 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
         dataManager.setUserTheme(newTheme);
     };
 
+    const handleDataChange = () => {
+      updateSummary();
+    };
+
     window.addEventListener('authChange', handleAuthChange);
     window.addEventListener('themeChanged', handleThemeChange);
+    window.addEventListener('datachanged', handleDataChange);
     
     handleAuthChange();
     handleThemeChange();
@@ -65,8 +70,9 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     return () => {
       window.removeEventListener('authChange', handleAuthChange);
       window.removeEventListener('themeChanged', handleThemeChange);
+      window.removeEventListener('datachanged', handleDataChange);
     };
-  }, []);
+  }, [updateSummary]);
 
   const handleAddTransaction = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

@@ -268,19 +268,37 @@ class DataManager {
     }
   }
 
-  async addTransaction(transactionData: any): Promise<Transaction | false> {
-    if (!this.currentUser) return false;
-    const transaction: Transaction = {
-      id: this._generateId(),
-      ...transactionData,
-      amount: parseFloat(transactionData.amount),
-      date: transactionData.date || new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    };
-    this.currentUser.financial.transactions.unshift(transaction);
-    this._updateBudgetAlerts(); // Atualiza alertas com base na nova transação
-    return (await this._saveData()) ? transaction : false;
+  // Em: src/core/DataManager.ts
+
+async addTransaction(transactionData: any): Promise<Transaction | false> {
+  if (!this.currentUser) return false;
+  
+  const transaction: Transaction = {
+    id: this._generateId(),
+    ...transactionData,
+    amount: parseFloat(transactionData.amount),
+    date: transactionData.date || new Date().toISOString().split('T')[0],
+    createdAt: new Date().toISOString()
+  };
+  
+  this.currentUser.financial.transactions.unshift(transaction);
+  this._updateBudgetAlerts();
+
+  try {
+    // OTIMIZAÇÃO: Usa updateDoc para salvar APENAS a lista de transações.
+    // A operação é leve, rápida e eficiente.
+    const userDocRef = doc(this.db, "users", this.currentUser.id);
+    await updateDoc(userDocRef, {
+      'financial.transactions': this.currentUser.financial.transactions
+    });
+    
+    return transaction;
+  } catch (error) {
+    console.error("Erro ao adicionar transação:", error);
+    this.currentUser.financial.transactions.shift(); 
+    return false;
   }
+}
 
   async removeTransaction(transactionId: string): Promise<boolean> {
     if (!this.currentUser) return false;

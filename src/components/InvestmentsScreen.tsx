@@ -39,6 +39,8 @@ export const InvestmentsScreen: React.FC<InvestmentsScreenProps> = ({ onNavigate
     return () => window.removeEventListener('authChange', fetchUserBalance);
   }, []);
 
+ // Substitua o bloco da linha 48 pelo código abaixo
+
   useEffect(() => {
     const fetchStocks = async () => {
       setIsLoading(true);
