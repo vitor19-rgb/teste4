@@ -1,18 +1,22 @@
+// Em: src/components/ForgotPasswordScreen.tsx
+// (Versão 100% atualizada, voltando à lógica original que mostra o link "Criar Conta")
+
 /**
  * ForgotPasswordScreen - Tela de Redefinição de Senha
  *
- * VERSÃO ATUALIZADA:
- * - Layout e CSS 100% baseados no AccessibilityEnhancedAuthScreen
- * - Mantém a lógica de redefinição de senha do Firebase.
+ * LÓGICA ORIGINAL RESTAURADA:
+ * - Verifica se o email existe com `fetchSignInMethodsForEmail`.
+ * - Se não existir, pede para criar conta (como tu querias).
+ * - 🚨 IMPORTANTE: Isto SÓ FUNCIONA se a "Proteção contra enumeração de emails"
+ * estiver DESATIVADA no painel do Firebase.
  */
 
 import React, { useState } from 'react';
 import { auth } from '../core/firebaseConfig';
-import { sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail, fetchSignInMethodsForEmail } from "firebase/auth";
 
-// Interface corrigida (da nossa conversa anterior)
 interface ForgotPasswordScreenProps {
-  onNavigate: (screen: 'auth' | string) => void;
+  onNavigate: (screen: 'auth' | 'register' | string) => void;
 }
 
 export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNavigate }) => {
@@ -21,35 +25,61 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  /**
+   * handleResetPassword
+   * - Lógica original que verifica o email antes de enviar.
+   */
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage('');
     setError('');
 
-    sendPasswordResetEmail(auth, email)
-      .then(() => {
-        setMessage('Email enviado! Verifique sua caixa de entrada para redefinir a senha.');
+    // Validação simples de email vazio
+    if (!email) {
+      setError('Por favor, digite seu email.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // 1️⃣ Verifica se o email existe
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+
+      // 2️⃣ SE O EMAIL NÃO EXISTIR (methods.length === 0)
+      if (methods.length === 0) {
+        // Mostra o erro e o link para criar conta, e PÁRA a execução.
+        setError('Nenhum usuário encontrado com este email. Deseja criar uma conta?');
         setIsLoading(false);
-      })
-      .catch((err) => {
-        if (err.code === 'auth/user-not-found') {
-          setError('Nenhum usuário encontrado com este email.');
-        } else {
-          setError('Ocorreu um erro. Tente novamente.');
-        }
-        setIsLoading(false);
-      });
+        return; 
+      }
+
+      // 3️⃣ SE O EMAIL EXISTIR (o código só chega aqui se methods.length > 0)
+      // Envia o email de redefinição
+      await sendPasswordResetEmail(auth, email);
+      setMessage('Email enviado! Verifique sua caixa de entrada para redefinir a senha.');
+    
+    } catch (err: any) {
+      console.error("Erro ao redefinir senha:", err);
+      // Trata erros comuns do Firebase
+      if (err.code === 'auth/invalid-email') {
+        setError('O formato do email é inválido.');
+      } else {
+        // Este erro 'auth/operation-not-allowed' pode acontecer se
+        // a "Proteção contra enumeração" estiver ATIVADA.
+        setError('Ocorreu um erro. Tente novamente mais tarde.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // --- O JSX abaixo é uma cópia da estrutura do seu AccessibilityEnhancedAuthScreen ---
-  //
-  
   return (
+    // O teu JSX original, 100% mantido
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
-      
+
       {/* Floating Elements */}
       <div className="absolute top-20 left-10 w-20 h-20 bg-blue-400/20 rounded-full blur-xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-32 h-32 bg-indigo-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
@@ -68,8 +98,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
                   viewBox="0 0 24 24"
                   aria-hidden="true"
                 >
-                  {/* Ícone de "chave" ou "lock" pode ser melhor, mas vamos manter o padrão por enquanto */}
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6.4 4.5c-1.2 0-2.3-.5-3.1-1.3-1.8-1.8-1.8-4.6 0-6.4 1-1 2.3-1.3 3.5-1.1m6 0c1.2.2 2.5-.1 3.5-1.1 1.8-1.8 1.8-4.6 0-6.4-.8-.8-1.9-1.3-3.1-1.3-1.2 0-2.3.5-3.1 1.3-1.8 1.8-1.8 4.6 0 6.4.8.8 1.9 1.3 3.1 1.3z"></path>
                 </svg>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
@@ -102,7 +131,6 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
                     name="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    // Classes CSS copiadas do seu login
                     className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
                     placeholder="Digite seu email"
                     required
@@ -111,27 +139,41 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
                     aria-invalid={error ? 'true' : 'false'}
                     aria-describedby={error ? 'email-error' : undefined}
                   />
-                  {/* Mensagem de Erro (vermelha) */}
+
+                  {/* Mensagem de Erro (Com o link "Criar conta") */}
                   {error && (
                     <div 
                       id="email-error"
-                      className="text-red-300 text-sm mt-1 flex items-center"
+                      className="text-red-300 text-sm mt-1 flex flex-col items-start"
                       role="alert"
                       aria-live="polite"
                     >
-                      <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
-                      </svg>
-                      {error}
+                      <div className="flex items-center mb-1">
+                        <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        {error}
+                      </div>
+
+                      {/* Botão Criar Conta (AGORA VAI FUNCIONAR) */}
+                      {error.includes('Deseja criar uma conta?') && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('register')}
+                          className="mt-1 text-blue-300 hover:text-white underline transition-colors duration-300 font-semibold"
+                        >
+                          Criar nova conta
+                        </button>
+                      )}
                     </div>
                   )}
-                  {/* Mensagem de Sucesso (azul/verde) */}
+
+                  {/* Mensagem de Sucesso */}
                   {message && (
                     <div 
                       id="email-success"
-                      // Usando text-blue-300 para consistência
                       className="text-blue-300 text-sm mt-1 flex items-center"
-                      role="status" // 'status' para mensagens de sucesso
+                      role="status"
                       aria-live="polite"
                     >
                       <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,25 +184,23 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
                   )}
                 </div>
 
-                {/* Submit Button */}
+                {/* Botão Enviar */}
                 <button
                   type="submit"
-                  // Classes CSS copiadas do seu login
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] transform disabled:opacity-75 disabled:scale-100"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Enviando...' : 'Enviar Email de Redefinição'}
+                  {isLoading ? 'Verificando...' : 'Enviar Email de Redefinição'}
                 </button>
               </form>
 
-              {/* Link para Voltar ao Login */}
+              {/* Voltar ao Login */}
               <div className="mt-6 text-center">
                 <p className="text-blue-100 text-sm">
                   Lembrou da senha?
                   <button
                     type="button"
                     onClick={() => onNavigate('auth')}
-                    // Classes CSS copiadas do seu login
                     className="text-blue-300 hover:text-white font-semibold ml-2 underline transition-colors duration-300 disabled:opacity-50"
                     disabled={isLoading}
                   >

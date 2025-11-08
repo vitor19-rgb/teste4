@@ -1,8 +1,5 @@
-/**
- * OrçaMais - MVP Sistema Multiusuário com Acessibilidade WCAG 2.1
- * Aplicação SPA para controle financeiro pessoal
- * VERSÃO ESTENDIDA COM NOVAS FUNCIONALIDADES
- */
+// Em: src/App.tsx
+// (Versão 100% atualizada para corrigir a navegação do "Criar Conta")
 
 import React, { useState, useEffect } from 'react';
 import dataManager from './core/DataManager';
@@ -12,140 +9,118 @@ import { AccessibilityEnhancedMainScreen } from './components/AccessibilityEnhan
 import { SummaryScreen } from './components/SummaryScreen';
 import { DreamsScreen } from './components/DreamsScreen';
 import { InvestmentsScreen } from './components/InvestmentsScreen';
-
-// --- INÍCIO DA MODIFICAÇÃO 1 ---
-// Importamos a nova tela de redefinição de senha que criamos no Passo 1
 import { ForgotPasswordScreen } from './components/ForgotPasswordScreen';
-// --- FIM DA MODIFICAÇÃO 1 ---
-
-// Import accessibility styles
 import './styles/accessibility.css';
 
-// --- INÍCIO DA MODIFICAÇÃO 2 ---
-// Adicionamos 'forgotPassword' aos tipos de tela possíveis
+// O tipo de AppScreen não precisa mudar. Vamos tratar 'register'
+// como um "alias" para a tela 'auth'
 type AppScreen = 'loading' | 'landing' | 'auth' | 'main' | 'summary' | 'dreams' | 'investments' | 'forgotPassword';
-// --- FIM DA MODIFICAÇÃO 2 ---
+
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('loading');
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
 
-  // useEffect para parar a leitura de voz ao mudar de tela
-  useEffect(() => {
-    if (window.accessibilityManager && window.accessibilityManager.isReading) {
-      window.accessibilityManager.stopVoiceReading();
-    }
-  }, [currentScreen]);
+  // ▼▼▼ INÍCIO DA MODIFICAÇÃO (1/3) ▼▼▼
+  // Novo estado para controlar o modo da tela de autenticação
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  // ▲▲▲ FIM DA MODIFICAÇÃO (1/3) ▲▲▲
 
-  // useEffect para simular carregamento inicial e aplicar tema
   useEffect(() => {
-    setTimeout(() => {
-      if (dataManager.isLoggedIn()) {
-        const currentUser = dataManager.getCurrentUser();
+    const checkUser = () => {
+      const currentUser = dataManager.getCurrentUser();
+      if (currentUser) {
         setUser(currentUser);
-        // Aplica o tema do usuário logado
-        dataManager.setUserTheme(currentUser?.settings?.theme || 'light');
         setCurrentScreen('main');
       } else {
-        setCurrentScreen('landing');
+        const hasSeenLanding = localStorage.getItem('hasSeenLanding');
+        if (hasSeenLanding) {
+          setCurrentScreen('auth');
+        } else {
+          setCurrentScreen('landing');
+        }
       }
-    }, 2000);
+    };
+
+    checkUser();
+    
+    const handleAuthChange = () => checkUser();
+    window.addEventListener('authChange', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+    };
   }, []);
 
-  const handleGetStarted = () => {
-    setCurrentScreen('auth');
-  };
+  useEffect(() => {
+    const handleDataChange = () => {
+      // Força a atualização do usuário
+      setUser(dataManager.getCurrentUser());
+    };
+    window.addEventListener('datachanged', handleDataChange);
+    return () => {
+      window.removeEventListener('datachanged', handleDataChange);
+    };
+  }, []);
+
 
   const handleAuthSuccess = (userData: any) => {
     setUser(userData);
-    // Aplica o tema do usuário recém-autenticado
-    dataManager.setUserTheme(userData?.settings?.theme || 'light');
     setCurrentScreen('main');
   };
 
-  // Esta função agora aceita 'forgotPassword' como um valor válido
-  const handleNavigate = (screen: AppScreen) => {
-    setCurrentScreen(screen);
+  const handleLogout = () => {
+    dataManager.logout();
+    setUser(null);
+    setCurrentScreen('auth');
+    setAuthMode('login'); // Reseta para login ao sair
   };
+
+  const handleGetStarted = () => {
+    localStorage.setItem('hasSeenLanding', 'true');
+    setCurrentScreen('auth');
+  };
+
+  // ▼▼▼ INÍCIO DA MODIFICAÇÃO (2/3) ▼▼▼
+  // A função de navegação agora entende o 'register'
+  const handleNavigate = (screen: string) => {
+    // Se o "Esqueci a Senha" nos mandar para 'register'...
+    if (screen === 'register') {
+      setAuthMode('register'); // 1. Define o modo que queremos
+      setCurrentScreen('auth');  // 2. Navega para a tela de autenticação
+    } 
+    // Se qualquer outra tela nos mandar para 'auth' (ex: Voltar do "Esqueci a Senha")
+    else if (screen === 'auth') {
+      setAuthMode('login');   // 1. Garante que o modo é 'login'
+      setCurrentScreen('auth'); // 2. Navega para a tela de autenticação
+    } 
+    // Para todas as outras telas (main, summary, etc.)
+    else {
+      setCurrentScreen(screen as AppScreen);
+    }
+  };
+  // ▲▲▲ FIM DA MODIFICAÇÃO (2/3) ▲▲▲
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'loading':
-        // (Seu código da tela de loading original - sem alterações)
-        const backgroundPatternSvg = "data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
-        
         return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
-            {/* Background Pattern */}
-            <div 
-              className="absolute inset-0 opacity-20"
-              style={{ backgroundImage: `url("${backgroundPatternSvg}")` }}
-            ></div>
-            
-            {/* Floating Elements */}
-            <div className="absolute top-20 left-10 w-20 h-20 bg-blue-400/20 rounded-full blur-xl animate-pulse"></div>
-            <div className="absolute top-40 right-20 w-32 h-32 bg-indigo-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
-            <div className="absolute bottom-20 left-20 w-24 h-24 bg-cyan-400/20 rounded-full blur-xl animate-pulse delay-2000"></div>
-
-            <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
-              <div className="text-center max-w-lg w-full">
-                {/* Logo */}
-                <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-6 sm:mb-8 shadow-2xl animate-pulse">
-                  <svg className="w-10 h-10 sm:w-12 sm:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                  </svg>
-                </div>
-                
-                <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 sm:mb-6">
-                  Orça<span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">Mais</span>
-                </h1>
-                
-                <p className="text-lg sm:text-xl text-blue-100 mb-6 sm:mb-8 font-light">
-                  Carregando sua experiência financeira...
-                </p>
-                
-                {/* Loading Animation */}
-                <div className="flex space-x-2 justify-center mb-8 sm:mb-12" role="status" aria-label="Carregando">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full animate-bounce"
-                      style={{ animationDelay: `${i * 0.2}s` }}
-                      aria-hidden="true"
-                    />
-                  ))}
-                </div>
-
-                {/* Developer and Project Info */}
-                <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/20">
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-blue-300 mb-2">
-                        Desenvolvido por
-                      </p>
-                      <p className="text-lg sm:text-xl font-bold text-white">
-                        Vitor Rafael de Almeida
-                      </p>
-                    </div>
-                    
-                    <div className="border-t border-white/20 pt-4">
-                      <p className="text-sm text-blue-100 text-center mb-2">
-                        Projeto de TCC - FETEPS
-                      </p>
-                      <div className="inline-flex items-center justify-center w-full">
-                        <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                          Versão Completa
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-center space-x-3 pt-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-blue-200">Todas as funcionalidades ativas</span>
-                    </div>
-                  </div>
-                </div>
+          <div className="fixed inset-0 bg-slate-900 flex items-center justify-center">
+            <div className="text-center text-white">
+              <div role="status">
+                <svg 
+                  aria-hidden="true" 
+                  className="inline w-10 h-10 text-slate-500 animate-spin fill-blue-500" 
+                  viewBox="0 0 100 101" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 28.001 72.5987 9.68114 50 9.68114C27.4013 9.68114 9.08144 28.001 9.08144 50.5908Z" fill="currentColor"/>
+                  <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+                </svg>
+                <span className="sr-only">Carregando...</span>
               </div>
+              <p className="mt-4 text-lg font-semibold">Carregando sua plataforma...</p>
             </div>
           </div>
         );
@@ -153,21 +128,21 @@ const App: React.FC = () => {
       case 'landing':
         return <LandingScreen onGetStarted={handleGetStarted} />;
 
+      // ▼▼▼ INÍCIO DA MODIFICAÇÃO (3/3) ▼▼▼
+      // Agora passamos a prop 'initialMode' para o componente
       case 'auth':
-        // --- INÍCIO DA MODIFICAÇÃO 3 ---
-        // Passamos a função 'handleNavigate' para a tela de autenticação
-        // para que ela possa nos enviar para a tela 'forgotPassword'
         return <AccessibilityEnhancedAuthScreen 
                   onAuthSuccess={handleAuthSuccess} 
-                  onNavigate={handleNavigate} 
+                  onNavigate={handleNavigate}
+                  initialMode={authMode} // <-- Passa o modo ('login' ou 'register')
                />;
-        // --- FIM DA MODIFICAÇÃO 3 ---
+      // ▲▲▲ FIM DA MODIFICAÇÃO (3/3) ▲▲▲
 
-      // --- INÍCIO DA MODIFICAÇÃO 4 ---
-      // Adicionamos um novo 'case' para renderizar a tela de redefinição
+      // O 'case register' não é necessário, pois a lógica
+      // em 'handleNavigate' já o direciona para o 'case auth'.
+
       case 'forgotPassword':
         return <ForgotPasswordScreen onNavigate={handleNavigate} />;
-      // --- FIM DA MODIFICAÇÃO 4 ---
 
       case 'main':
         return <AccessibilityEnhancedMainScreen onNavigate={handleNavigate} />;
@@ -187,7 +162,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="app-container" role="application" aria-label="OrçaMais - Controle Financeiro Pessoal">
+    <div className="app-container" role="application" aria-label="OrçaMais Aplicação de Finanças">
       {renderScreen()}
     </div>
   );

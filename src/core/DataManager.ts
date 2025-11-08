@@ -39,6 +39,17 @@ interface Transaction {
   category: string;
   date: string;
   createdAt: string;
+
+  // ▼▼▼ ADICIONE ESTAS LINHAS ▼▼▼
+  // Este campo será opcional e só existirá em transações
+  // da categoria 'Investimentos'
+  investmentData?: {
+    stockCode: string;    // Ex: "PETR4"
+    quantity: number;     // Ex: 10
+    purchasePrice: number; // Ex: 50.00 (preço por ação na compra)
+    logo: string;         // A URL do logo que já guardamos
+  };
+  // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
 }
 
 interface CategoryBudget {

@@ -717,7 +717,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ onNavigate }) => {
   <p className={`text-sm sm:text-lg lg:text-2xl font-bold ${
     currentSummary.balance >= 0 ? 'text-blue-900' : 'text-red-900'
   }`}>
-    {`R$ ${currentSummary.balance < 0 ? '-' : ''}${formatCurrency(Math.abs(currentSummary.balance)).replace('R$', '').trim()}`}
+    {`R$ ${currentSummary.balance < 0 ? '- ' : ''}${formatCurrency(Math.abs(currentSummary.balance)).replace('R$', '').trim()}`}
   </p>
 
   {comparison && (

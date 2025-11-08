@@ -6,37 +6,41 @@
  * - Mantém 100% do CSS/HTML e funções de acessibilidade originais.
  * - Adiciona o link "Esqueceu a senha?" (Passo 3).
  * - Integra login/cadastro com Firebase (Passo 4).
+ * - CORREÇÃO: Recebe 'initialMode' para corrigir bug de navegação.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-// import dataManager from '../core/DataManager'; // Removido
 import { validateEmail, validatePassword } from '../utils/formatters';
 
-// --- INÍCIO DA MODIFICAÇÃO (NOVOS IMPORTS) ---
-import { auth } from '../core/firebaseConfig'; // Importamos a config do Firebase
+import { auth } from '../core/firebaseConfig';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile // Usado para salvar o NOME do usuário no Firebase
+  updateProfile
 } from 'firebase/auth';
-// --- FIM DA MODIFICAÇÃO ---
 
 
-// --- INÍCIO DA MODIFICAÇÃO 1 (Props) ---
-// Adicionamos 'onNavigate' para o "Esqueceu a senha?"
+// --- INÍCIO DA MODIFICAÇÃO (1/3) ---
+// Adicionamos 'initialMode' às props
 interface AuthScreenProps {
   onAuthSuccess: (userData: any) => void;
-  onNavigate: (screen: 'forgotPassword' | string) => void; // Prop do Passo 3
+  onNavigate: (screen: 'forgotPassword' | string) => void;
+  initialMode?: 'login' | 'register'; // <-- ADICIONADO
 }
 
-// Recebemos 'onNavigate'
+// Recebemos 'onNavigate' e 'initialMode'
 export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({ 
   onAuthSuccess, 
-  onNavigate 
+  onNavigate,
+  initialMode = 'login' // <-- ADICIONADO
 }) => {
-// --- FIM DA MODIFICAÇÃO 1 ---
+// --- FIM DA MODIFICAÇÃO (1/3) ---
 
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  // --- INÍCIO DA MODIFICAÇÃO (2/3) ---
+  // O estado agora começa com base na prop que recebemos
+  const [isLoginMode, setIsLoginMode] = useState(initialMode === 'login');
+  // --- FIM DA MODIFICAÇÃO (2/3) ---
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -48,14 +52,11 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
     password: ''
   });
   
-  // --- INÍCIO DA MODIFICAÇÃO (Novo Estado) ---
-  const [isLoading, setIsLoading] = useState(false); // Para desativar botões
-  // --- FIM DA MODIFICAÇÃO ---
+  const [isLoading, setIsLoading] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Suas funções originais (mantidas)
   useEffect(() => {
     if (firstInputRef.current) {
       firstInputRef.current.focus();
@@ -119,9 +120,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    // --- INÍCIO DA MODIFICAÇÃO ---
     setIsLoading(true); // Ativa o loading
-    // --- FIM DA MODIFICAÇÃO ---
     
     if (isLoginMode) {
       await handleLogin();
@@ -130,7 +129,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
 
-  // --- INÍCIO DA MODIFICAÇÃO 2: handleLogin com Firebase (Passo 4) ---
   const handleLogin = async () => {
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -155,9 +153,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
       announceError(`Erro ao fazer login: ${message}`);
     }
   };
-  // --- FIM DA MODIFICAÇÃO 2 ---
 
-  // --- INÍCIO DA MODIFICAÇÃO 3: handleRegister com Firebase (Passo 4) ---
   const handleRegister = async () => {
     try {
       // 1. Criamos o usuário
@@ -192,17 +188,20 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
       announceError(`Erro ao criar conta: ${message}`);
     }
   };
-  // --- FIM DA MODIFICAÇÃO 3 ---
 
 
-  // Função original
+  // --- INÍCIO DA MODIFICAÇÃO (3/3) ---
+  // A tua função original está ótima.
+  // Apenas limpa os dados do formulário também.
   const handleModeToggle = () => {
     setIsLoginMode(!isLoginMode);
     clearErrors();
+    setFormData({ name: '', email: '', password: '' }); // <-- ADICIONADO
     announceError(isLoginMode ? 'Modo de cadastro ativado' : 'Modo de login ativado');
   };
+  // --- FIM DA MODIFICAÇÃO (3/3) ---
 
-  // --- O JSX abaixo é o seu original, com 'disabled' e o novo link ---
+  // --- O JSX abaixo é o teu original, sem nenhuma alteração nos ícones ou layout ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
       {/* Background Pattern */}
@@ -218,6 +217,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
             {/* Header */}
             <header className="text-center mb-6 sm:mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-4 sm:mb-6 shadow-xl">
+                {/* O TEU ÍCONE ORIGINAL (MANTIDO) */}
                 <svg 
                   className="w-8 h-8 sm:w-10 sm:h-10 text-white" 
                   fill="none" 
@@ -267,7 +267,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                       aria-invalid={errors.name ? 'true' : 'false'}
                       aria-describedby={errors.name ? 'name-error' : undefined}
                       autoComplete="name"
-                      disabled={isLoading} // <-- MODIFICAÇÃO
+                      disabled={isLoading}
                     />
                     {errors.name && (
                       <div 
@@ -307,7 +307,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                     aria-invalid={errors.email ? 'true' : 'false'}
                     aria-describedby={errors.email ? 'email-error' : undefined}
                     autoComplete="email"
-                    disabled={isLoading} // <-- MODIFICAÇÃO
+                    disabled={isLoading}
                   />
                   {errors.email && (
                     <div 
@@ -345,7 +345,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                     aria-invalid={errors.password ? 'true' : 'false'}
                     aria-describedby={errors.password ? 'password-error password-help' : 'password-help'}
                     autoComplete={isLoginMode ? 'current-password' : 'new-password'}
-                    disabled={isLoading} // <-- MODIFICAÇÃO
+                    disabled={isLoading}
                   />
                   {errors.password && (
                     <div 
@@ -370,7 +370,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                   )}
                 </div>
 
-                {/* --- INÍCIO DA MODIFICAÇÃO 4 (Link "Esqueceu a senha?") --- */}
+                {/* Link "Esqueceu a senha?" */}
                 {isLoginMode && (
                   <div className="text-right text-sm">
                     <button
@@ -383,7 +383,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                     </button>
                   </div>
                 )}
-                {/* --- FIM DA MODIFICAÇÃO 4 --- */}
 
 
                 {/* Submit Button */}
@@ -391,9 +390,8 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                   type="submit"
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] transform disabled:opacity-75 disabled:scale-100"
                   aria-describedby="submit-help"
-                  disabled={isLoading} // <-- MODIFICAÇÃO
+                  disabled={isLoading}
                 >
-                  {/* --- MODIFICAÇÃO (Texto do botão) --- */}
                   {isLoading ? 'Carregando...' : (isLoginMode ? 'Acessar Plataforma' : 'Criar Conta Profissional')}
                 </button>
                 <div id="submit-help" className="sr-only">
@@ -410,15 +408,12 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                     onClick={handleModeToggle}
                     className="text-blue-300 hover:text-white font-semibold ml-2 underline transition-colors duration-300 disabled:opacity-50"
                     aria-label={isLoginMode ? 'Alternar para modo de cadastro' : 'Alternar para modo de login'}
-                    disabled={isLoading} // <-- MODIFICAÇÃO
+                    disabled={isLoading}
                   >
                     {isLoginMode ? 'Criar conta profissional' : 'Fazer login'}
                   </button>
                 </p>
               </div>
-
-              {/* Demo Info - REMOVIDO, pois agora é um login real com Firebase */}
-              
             </main>
           </div>
         </div>
