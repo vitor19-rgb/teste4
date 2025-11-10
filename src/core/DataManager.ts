@@ -1,3 +1,6 @@
+// Em: src/core/DataManager.ts
+// (Versão 100% atualizada com a categoria "Sonhos")
+
 /**
  * DataManager - Gerenciador centralizado de dados do OrçaMais
  * Responsável por toda a persistência de dados no Firebase (Firestore)
@@ -39,17 +42,13 @@ interface Transaction {
   category: string;
   date: string;
   createdAt: string;
-
-  // ▼▼▼ ADICIONE ESTAS LINHAS ▼▼▼
-  // Este campo será opcional e só existirá em transações
-  // da categoria 'Investimentos'
+  // Este campo opcional já existe e está correto
   investmentData?: {
-    stockCode: string;    // Ex: "PETR4"
-    quantity: number;     // Ex: 10
-    purchasePrice: number; // Ex: 50.00 (preço por ação na compra)
-    logo: string;         // A URL do logo que já guardamos
+    stockCode: string;
+    quantity: number;
+    purchasePrice: number;
+    logo: string;
   };
-  // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
 }
 
 interface CategoryBudget {
@@ -163,7 +162,12 @@ class DataManager {
       'amaciante', 'sabão', 'vassoura', 'rodo', 'pano', 'esponja', 'luva',
       'magazine luiza', 'casas bahia', 'extra', 'ponto frio', 'americanas', 'submarino',
       'mercado livre', 'amazon', 'shopee', 'aliexpress', 'wish', 'olx'
+    ],
+    // ▼▼▼ CATEGORIA ADICIONADA ▼▼▼
+    'Sonhos': [
+      'sonho', 'meta', 'objetivo', 'viagem', 'contribuição', 'reserva'
     ]
+    // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
   };
 
   // =================================================================
@@ -339,6 +343,7 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
     return (await this._saveData()) ? dream : false;
   }
 
+  // Esta função já existia e é a que vamos usar!
   async updateDreamSavings(dreamId: string, savedAmount: number): Promise<boolean> {
     if (!this.currentUser) return false;
     const dream = this.currentUser.financial.dreams.find(d => d.id === dreamId);
@@ -614,7 +619,9 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
       profile: { name: userData.name, email: userData.email, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() },
       financial: {
         monthlyIncomes: {}, transactions: [],
-        categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Investimentos', 'Outros'], // <-- Adicionado aqui
+        // ▼▼▼ MODIFICAÇÃO AQUI ▼▼▼
+        categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Investimentos', 'Sonhos', 'Outros'],
+        // ▲▲▲ FIM DA MODIFICAÇÃO ▲▲▲
         goals: [], categoryBudgets: {}, dreams: [], alerts: []
       },
       settings: { currency: 'BRL', theme: 'light', notifications: true }
