@@ -13,15 +13,33 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
   const [summary, setSummary] = useState<any>(null);
   const [editingIncome, setEditingIncome] = useState(false);
   const [tempIncome, setTempIncome] = useState('');
+  
+  // Estados do Formulário
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
     type: 'expense',
     category: 'Outros'
   });
+
+  // ▼▼▼ ESTADOS PARA RECORRÊNCIA ▼▼▼
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceDay, setRecurrenceDay] = useState('');
+  const [recurrenceLimit, setRecurrenceLimit] = useState('');
+  // ▲▲▲▲▲▲
+
   const [showSpendingAlert, setShowSpendingAlert] = useState(false);
 
   const categories = dataManager.getCategories();
+
+  // O ROBÔ: Verifica transações automáticas ao iniciar
+  useEffect(() => {
+    if (typeof dataManager.processRecurringTransactions === 'function') {
+       dataManager.processRecurringTransactions().then(() => {
+         updateSummary();
+       });
+    }
+  }, []);
 
   const updateSummary = useCallback(() => {
     const newSummary = dataManager.getFinancialSummary(currentPeriod);
@@ -74,19 +92,58 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     };
   }, [updateSummary]);
 
+  // Função auxiliar para formatar a data apenas visualmente (DD/MM/AAAA)
+  const formatDateDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      // Verifica se a data é válida
+      if (isNaN(date.getTime())) return dateString;
+      return date.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   const handleAddTransaction = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount) return;
     
-    const transaction = await dataManager.addTransaction({ ...formData, date: currentPeriod + '-01' });
+    // Prepara dados da recorrência
+    const day = isRecurring ? (parseInt(recurrenceDay) || new Date().getDate()) : undefined;
+    const limit = isRecurring && recurrenceLimit ? parseInt(recurrenceLimit) : undefined;
+
+    // Data atual completa (ISO) para salvar no banco
+    const transactionDate = new Date().toISOString();
+
+    const transactionData = { 
+        ...formData, 
+        date: transactionDate, 
+        
+        // Dados de Recorrência
+        isRecurring,
+        recurrenceDay: day,
+        recurrenceLimit: limit,
+        recurrenceCurrent: 0,
+        
+        // Marcamos o mês atual como "já gerado" para esta transação manual
+        lastGeneratedMonth: isRecurring ? currentPeriod : null
+    };
+    
+    const transaction = await dataManager.addTransaction(transactionData);
     
     if (transaction) {
+      // Limpa formulário
       setFormData({ description: '', amount: '', type: 'expense', category: 'Outros' });
+      setIsRecurring(false);
+      setRecurrenceDay('');
+      setRecurrenceLimit('');
+
       updateSummary();
     } else {
       alert('Erro ao adicionar transação.');
     }
-  }, [formData, currentPeriod, updateSummary]);
+  }, [formData, currentPeriod, isRecurring, recurrenceDay, recurrenceLimit, updateSummary]);
 
   const deleteTransaction = useCallback(async (transactionId: string) => {
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
@@ -197,7 +254,7 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span>Resumo</span>
+                <span>Relatório</span>
               </button>
 
               <button
@@ -261,7 +318,7 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
             </button>
           </div>
 
-        {/* SEÇÃO RENDA MENSAL */}
+        {/* SEÇÃO RENDA MENSAL MANTIDA (MOBILE) */}
         <div
           className="block sm:hidden bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border border-blue-200 shadow-[0_4px_24px_0_rgba(37,99,235,0.10)] px-6 pt-5 pb-4 relative mx-auto flex flex-col gap-0 renda-mensal-mobile-card"
           style={{
@@ -380,6 +437,7 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
           )}
         </div>
 
+        {/* SEÇÃO RENDA MENSAL MANTIDA (DESKTOP) */}
         <div className="hidden sm:block bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-6 mb-6 border border-blue-100 w-full max-w-[1104px] h-[258.4px] shadow-lg relative mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
@@ -677,6 +735,155 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
                 </select>
               </div>
             </div>
+{/* ================================================= */}
+{/* ▼▼▼ SEÇÃO DE RECORRÊNCIA (CHECKBOX 25px) ▼▼▼ */}
+{/* ================================================= */}
+<div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 dark:bg-gray-900 dark:border-gray-700">
+    {/* Checkbox Container - Checkbox 25px */}
+    <label className="flex items-center gap-3.5 cursor-pointer flex-wrap">
+        {/* Container do checkbox com tamanho FIXO 25px */}
+        <div className="relative w-[25px] h-[25px] flex-shrink-0">
+            <input 
+                type="checkbox" 
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className="
+                    absolute top-0 left-0
+                    w-full h-full
+                    m-0 p-0
+                    appearance-none
+                    cursor-pointer
+                    border-2 border-gray-300 rounded-[5px]
+                    checked:bg-blue-600 checked:border-blue-600
+                    focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+                    dark:border-gray-600 dark:bg-gray-700
+                    dark:checked:bg-blue-600
+                    /* Remove qualquer transformação */
+                    transform-none
+                    /* Garante o box model correto */
+                    box-border
+                "
+                style={{
+                    // Força o tamanho dentro do container
+                    width: '100%',
+                    height: '100%',
+                    // Sobrescreve qualquer CSS externo
+                    minWidth: '100%',
+                    minHeight: '100%',
+                    maxWidth: '100%',
+                    maxHeight: '100%'
+                }}
+            />
+            {/* Ícone de check - proporcionalmente maior */}
+            <svg 
+                className={`
+                    absolute top-1/2 left-1/2 
+                    -translate-x-1/2 -translate-y-1/2
+                    w-[14px] h-[14px]           /* 14px (proporcional ao checkbox de 25px) */
+                    text-white 
+                    pointer-events-none 
+                    transition-opacity 
+                    duration-150
+                    ${isRecurring ? 'opacity-100' : 'opacity-0'}
+                `}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                strokeWidth="3.5"
+            >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+        </div>
+        
+        {/* Texto do checkbox - proporcionalmente maior */}
+        <span className="text-[15px] text-gray-700 dark:text-gray-200 font-medium select-none leading-tight">
+            Repetir mensalmente?
+        </span>
+    </label>
+
+    {isRecurring && (
+        <div className="mt-3.5 grid grid-cols-1 gap-3.5 animate-fade-in">
+            {/* Campo Dia - Proporcionalmente maior */}
+            <div className="w-full">
+                <label className="block text-[13px] text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    Dia da cobrança (1-31)
+                </label>
+                <div className="relative">
+                    <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={recurrenceDay}
+                        onChange={(e) => setRecurrenceDay(e.target.value)}
+                        placeholder={`Ex: ${new Date().getDate()}`}
+                        className="
+                            w-full 
+                            px-4 py-3                /* Aumentado: 16px × 12px */
+                            border-2 border-gray-300 
+                            rounded-lg 
+                            focus:ring-2 focus:ring-blue-500 
+                            focus:border-blue-500 
+                            outline-none 
+                            text-[15px]              /* 15px */
+                            dark:bg-gray-800 
+                            dark:border-gray-600 
+                            dark:text-white 
+                            transition-colors
+                            h-11                     /* Altura 44px */
+                            /* Remove estilos de número nativo */
+                            [-moz-appearance:textfield]
+                            [&::-webkit-outer-spin-button]:appearance-none
+                            [&::-webkit-inner-spin-button]:appearance-none
+                        "
+                    />
+                </div>
+            </div>
+            
+            {/* Campo Duração - Proporcionalmente maior */}
+            <div className="w-full">
+                <label className="block text-[13px] text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    Duração (Meses)
+                </label>
+                <div className="relative">
+                    <input
+                        type="number"
+                        min="1"
+                        value={recurrenceLimit}
+                        onChange={(e) => setRecurrenceLimit(e.target.value)}
+                        placeholder="Vazio = Fixo"
+                        className="
+                            w-full 
+                            px-4 py-3                /* Aumentado: 16px × 12px */
+                            border-2 border-gray-300 
+                            rounded-lg 
+                            focus:ring-2 focus:ring-blue-500 
+                            focus:border-blue-500 
+                            outline-none 
+                            text-[15px]              /* 15px */
+                            dark:bg-gray-800 
+                            dark:border-gray-600 
+                            dark:text-white 
+                            transition-colors
+                            h-11                     /* Altura 44px */
+                            /* Remove setinhas do input number */
+                            [-moz-appearance:textfield]
+                            [&::-webkit-outer-spin-button]:appearance-none
+                            [&::-webkit-inner-spin-button]:appearance-none
+                        "
+                    />
+                </div>
+            </div>
+            
+            {/* Texto de ajuda - proporcionalmente maior */}
+            <p className="text-[12px] text-gray-400 dark:text-gray-500 italic leading-tight">
+                * Deixe a duração vazia para contas fixas (ex: Netflix, Aluguel).
+            </p>
+        </div>
+    )}
+</div>
+{/* ================================================= */}
+{/* ▲▲▲ FIM DA SEÇÃO DE RECORRÊNCIA ▲▲▲ */}
+{/* ================================================= */}
 
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
@@ -751,9 +958,20 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
                         </svg>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
+                           {transaction.originalTransactionId && (
+                               <span title="Transação recorrente" className="text-gray-400">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                               </span>
+                           )}
+                        </div>
                         <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          <span>{transaction.date}</span>
+                          {/* AQUI: Usamos a função auxiliar para mostrar a data LIMPA */}
+                          <span>{formatDateDisplay(transaction.date)}</span>
+                          
                           <span className="mx-2">•</span>
                           <span
                             className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800/50 dark:!text-blue-300"

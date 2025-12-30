@@ -1,11 +1,11 @@
 // Em: src/core/DataManager.ts
-// (Versão 100% atualizada com a categoria "Sonhos")
+// (Versão 100% atualizada com a categoria "Sonhos" e Lógica de Recorrência)
 
 /**
  * DataManager - Gerenciador centralizado de dados do OrçaMais
  * Responsável por toda a persistência de dados no Firebase (Firestore)
  * e gerenciamento de estado da aplicação.
- * VERSÃO COMPLETA E CORRIGIDA PARA FIREBASE
+ * VERSÃO COMPLETA E CORRIGIDA PARA FIREBASE + RECORRÊNCIA
  */
 
 // 1. IMPORTAÇÕES DO FIREBASE E TIPOS
@@ -24,9 +24,12 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { auth, db } from "../core/firebaseConfig"; // <-- VERIFIQUE SE ESTE CAMINHO ESTÁ CORRETO
+import { auth, db } from "../core/firebaseConfig";
 
-// As interfaces permanecem exatamente as mesmas.
+// =================================================================
+// INTERFACES (TIPAGEM)
+// =================================================================
+
 interface UserProfile {
   name: string;
   email: string;
@@ -34,7 +37,7 @@ interface UserProfile {
   lastLogin: string;
 }
 
-interface Transaction {
+export interface Transaction {
   id: string;
   description: string;
   amount: number;
@@ -42,13 +45,23 @@ interface Transaction {
   category: string;
   date: string;
   createdAt: string;
-  // Este campo opcional já existe e está correto
+  
+  // Dados de Investimento (Opcional)
   investmentData?: {
     stockCode: string;
     quantity: number;
     purchasePrice: number;
     logo: string;
   };
+
+  // ▼▼▼ NOVOS CAMPOS DE RECORRÊNCIA ▼▼▼
+  isRecurring?: boolean;         // É uma transação pai (recorrente)?
+  recurrenceDay?: number;        // Dia do mês (1-31)
+  recurrenceLimit?: number;      // Quantas vezes repetir (null/0 = infinito)
+  recurrenceCurrent?: number;    // Contador de quantas já foram criadas
+  lastGeneratedMonth?: string;   // Ex: "2023-11" (Para evitar duplicatas no mesmo mês)
+  originalTransactionId?: string;// ID da transação pai (para as cópias geradas)
+  // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
 }
 
 interface CategoryBudget {
@@ -99,14 +112,13 @@ interface UserData {
   };
 }
 
-
 class DataManager {
   private auth: Auth;
   private db: Firestore;
   private currentUser: UserData | null = null;
   public isInitialized: boolean = false;
 
-  // MAPEAMENTO COMPLETO DE PALAVRAS-CHAVE (MANTIDO DO ORIGINAL)
+  // MAPEAMENTO COMPLETO DE PALAVRAS-CHAVE
   private categoryKeywords: Record<string, string[]> = {
     'Alimentação': [
       'supermercado', 'padaria', 'restaurante', 'lanchonete', 'mercado', 'feira', 'açougue', 
@@ -163,11 +175,9 @@ class DataManager {
       'magazine luiza', 'casas bahia', 'extra', 'ponto frio', 'americanas', 'submarino',
       'mercado livre', 'amazon', 'shopee', 'aliexpress', 'wish', 'olx'
     ],
-    // ▼▼▼ CATEGORIA ADICIONADA ▼▼▼
     'Sonhos': [
       'sonho', 'meta', 'objetivo', 'viagem', 'contribuição', 'reserva'
     ]
-    // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
   };
 
   // =================================================================
@@ -220,7 +230,6 @@ class DataManager {
   async loginUser(email: string, password: string): Promise<{ success: boolean; user?: UserData; message?: string }> {
     try {
       await signInWithEmailAndPassword(this.auth, email, password);
-      // onAuthStateChanged cuidará de carregar os dados.
       return { success: true, user: this.currentUser! };
     } catch (error: any) {
       return { success: false, message: 'Usuário ou senha inválidos.' };
@@ -238,9 +247,81 @@ class DataManager {
   getCurrentUser(): UserData | null {
     return this.currentUser;
   }
+
+  // =================================================================
+  // LÓGICA DE RECORRÊNCIA (O ROBÔ)
+  // =================================================================
+
+  async processRecurringTransactions() {
+    if (!this.currentUser) return;
+
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const currentDay = today.getDate();
+    let updatesMade = false;
+
+    // Filtramos apenas as transações que são "Mães" de recorrência (isRecurring = true)
+    const recurringParents = this.currentUser.financial.transactions.filter(t => t.isRecurring === true);
+
+    for (const parent of recurringParents) {
+      // 1. Verificação de Limite (se houver)
+      if (parent.recurrenceLimit && (parent.recurrenceCurrent || 0) >= parent.recurrenceLimit) {
+        continue;
+      }
+
+      // 2. Verificação de Duplicidade no Mês Atual
+      if (parent.lastGeneratedMonth === currentMonthKey) {
+        continue;
+      }
+
+      // 3. Verificação do Dia (Hoje é dia ou já passou do dia?)
+      // Se recurrenceDay não existir, assumimos dia 1
+      const triggerDay = parent.recurrenceDay || 1;
+      
+      if (currentDay >= triggerDay) {
+        // --- CRIAR A NOVA TRANSAÇÃO (FILHA) ---
+        const newDate = new Date();
+        newDate.setDate(triggerDay); 
+        
+        // Garantir que a data é do mês atual, mesmo se hoje for dia 31 e o trigger for dia 5
+        // (O newDate() já pega o mês atual, então setDate ajusta para o dia correto deste mês)
+        
+        const childTransactionData = {
+          description: parent.description,
+          amount: parent.amount,
+          type: parent.type,
+          category: parent.category,
+          date: newDate.toISOString().split('T')[0], // YYYY-MM-DD
+          isRecurring: false,              // A filha NÃO é recorrente
+          originalTransactionId: parent.id // Referência à mãe
+        };
+
+        // Adiciona a filha usando o método interno (mas sem chamar _saveData a cada loop para otimizar)
+        const childId = this._generateId();
+        const childTransaction: Transaction = {
+            id: childId,
+            ...childTransactionData,
+            createdAt: new Date().toISOString()
+        };
+        this.currentUser.financial.transactions.unshift(childTransaction);
+
+        // --- ATUALIZAR A MÃE ---
+        parent.lastGeneratedMonth = currentMonthKey;
+        parent.recurrenceCurrent = (parent.recurrenceCurrent || 0) + 1;
+        
+        updatesMade = true;
+      }
+    }
+
+    // Se fizemos alterações, salvamos tudo de uma vez no final
+    if (updatesMade) {
+        await this._saveData(); // Salva user inteiro para garantir consistência
+        console.log('🔄 Transações recorrentes processadas com sucesso.');
+    }
+  }
   
   // =================================================================
-  // MÉTODOS DE ESCRITA (WRITE) - ADAPTADOS PARA SEREM ASSÍNCRONOS
+  // MÉTODOS DE ESCRITA (WRITE)
   // =================================================================
 
   private async _saveData(): Promise<boolean> {
@@ -257,8 +338,7 @@ class DataManager {
   async setUserTheme(theme: 'light' | 'dark'): Promise<boolean> {
     if (!this.currentUser) return false;
     this.currentUser.settings.theme = theme;
-    this._applyUserTheme(); // Aplica visualmente
-    // Usa updateDoc para eficiência
+    this._applyUserTheme();
     try {
         await updateDoc(doc(this.db, "users", this.currentUser.id), { 'settings.theme': theme });
         return true;
@@ -271,7 +351,6 @@ class DataManager {
   async setMonthlyIncome(yearMonth: string, amount: number): Promise<boolean> {
     if (!this.currentUser) return false;
     this.currentUser.financial.monthlyIncomes[yearMonth] = parseFloat(amount.toString()) || 0;
-    // Usa updateDoc para eficiência
     try {
         await updateDoc(doc(this.db, "users", this.currentUser.id), { 
             [`financial.monthlyIncomes.${yearMonth}`]: this.currentUser.financial.monthlyIncomes[yearMonth] 
@@ -283,37 +362,43 @@ class DataManager {
     }
   }
 
-  // Em: src/core/DataManager.ts
-
-async addTransaction(transactionData: any): Promise<Transaction | false> {
-  if (!this.currentUser) return false;
-  
-  const transaction: Transaction = {
-    id: this._generateId(),
-    ...transactionData,
-    amount: parseFloat(transactionData.amount),
-    date: transactionData.date || new Date().toISOString().split('T')[0],
-    createdAt: new Date().toISOString()
-  };
-  
-  this.currentUser.financial.transactions.unshift(transaction);
-  this._updateBudgetAlerts();
-
-  try {
-    // OTIMIZAÇÃO: Usa updateDoc para salvar APENAS a lista de transações.
-    // A operação é leve, rápida e eficiente.
-    const userDocRef = doc(this.db, "users", this.currentUser.id);
-    await updateDoc(userDocRef, {
-      'financial.transactions': this.currentUser.financial.transactions
-    });
+  async addTransaction(transactionData: any): Promise<Transaction | false> {
+    if (!this.currentUser) return false;
     
-    return transaction;
-  } catch (error) {
-    console.error("Erro ao adicionar transação:", error);
-    this.currentUser.financial.transactions.shift(); 
-    return false;
+    // Criação do objeto com suporte aos novos campos de recorrência
+    const transaction: Transaction = {
+      id: this._generateId(),
+      ...transactionData,
+      amount: parseFloat(transactionData.amount),
+      date: transactionData.date || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      
+      // Campos de Recorrência (Defaults seguros)
+      isRecurring: transactionData.isRecurring || false,
+      recurrenceDay: transactionData.recurrenceDay || null,
+      recurrenceLimit: transactionData.recurrenceLimit || null,
+      recurrenceCurrent: transactionData.recurrenceCurrent || 0,
+      lastGeneratedMonth: transactionData.lastGeneratedMonth || null,
+      originalTransactionId: transactionData.originalTransactionId || null
+    };
+    
+    this.currentUser.financial.transactions.unshift(transaction);
+    this._updateBudgetAlerts();
+
+    try {
+      // OTIMIZAÇÃO: Usa updateDoc para salvar APENAS a lista de transações.
+      const userDocRef = doc(this.db, "users", this.currentUser.id);
+      await updateDoc(userDocRef, {
+        'financial.transactions': this.currentUser.financial.transactions
+      });
+      
+      return transaction;
+    } catch (error) {
+      console.error("Erro ao adicionar transação:", error);
+      this.currentUser.financial.transactions.shift(); 
+      return false;
+    }
   }
-}
 
   async removeTransaction(transactionId: string): Promise<boolean> {
     if (!this.currentUser) return false;
@@ -343,7 +428,6 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
     return (await this._saveData()) ? dream : false;
   }
 
-  // Esta função já existia e é a que vamos usar!
   async updateDreamSavings(dreamId: string, savedAmount: number): Promise<boolean> {
     if (!this.currentUser) return false;
     const dream = this.currentUser.financial.dreams.find(d => d.id === dreamId);
@@ -379,7 +463,7 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
   }
 
   // =================================================================
-  // MÉTODOS DE LEITURA (READ) E LÓGICA DE NEGÓCIO - SEM ALTERAÇÃO
+  // MÉTODOS DE LEITURA (READ) E LÓGICA DE NEGÓCIO
   // =================================================================
 
   suggestCategory(description: string): string {
@@ -601,7 +685,6 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
         this.currentUser!.financial.alerts.push(alert);
       }
     });
-    // A chamada para _saveData() será feita pelo método público que invocou este.
   }
 
   private _getCurrentPeriod(): string {
@@ -619,28 +702,26 @@ async addTransaction(transactionData: any): Promise<Transaction | false> {
       profile: { name: userData.name, email: userData.email, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() },
       financial: {
         monthlyIncomes: {}, transactions: [],
-        // ▼▼▼ MODIFICAÇÃO AQUI ▼▼▼
         categories: ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Compras', 'Investimentos', 'Sonhos', 'Outros'],
-        // ▲▲▲ FIM DA MODIFICAÇÃO ▲▲▲
         goals: [], categoryBudgets: {}, dreams: [], alerts: []
       },
       settings: { currency: 'BRL', theme: 'light', notifications: true }
     };
   }
 
- private _applyUserTheme(): void {
-  if (!this.currentUser) return;
-  const theme = this.currentUser.settings.theme;
-  const root = document.documentElement;
-  if (theme === 'dark') {
-    root.classList.add('dark');
-    root.setAttribute('data-theme', 'dark');
-  } else {
-    root.classList.remove('dark');
-    root.setAttribute('data-theme', 'light');
+  private _applyUserTheme(): void {
+    if (!this.currentUser) return;
+    const theme = this.currentUser.settings.theme;
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    }
   }
-  // A linha que dispara o evento foi REMOVIDA.
-}}
+}
 
 // Instância singleton e exportação
 const dataManager = new DataManager();

@@ -1,5 +1,6 @@
 // src/App.tsx
 // ✅ Versão final com tela de loading bonita e lógica 100% corrigida
+// ✅ Tempo de loading aumentado para 5 segundos
 
 import React, { useState, useEffect } from 'react';
 import dataManager from './core/DataManager';
@@ -47,7 +48,7 @@ const App: React.FC = () => {
 
     const timer = setTimeout(() => {
       checkUser();
-    }, 2000); // tempo da tela de loading
+    }, 5000); // MODIFICADO: tempo da tela de loading (5 segundos)
 
     const handleAuthChange = () => checkUser();
     window.addEventListener('authChange', handleAuthChange);
@@ -83,7 +84,7 @@ const App: React.FC = () => {
     setTimeout(() => {
       setAuthMode('login');
       setCurrentScreen('auth'); // vai para tela de login
-    }, 2000);
+    }, 5000); // MODIFICADO: tempo de loading no logout (5 segundos)
   };
 
   const handleGetStarted = () => {
