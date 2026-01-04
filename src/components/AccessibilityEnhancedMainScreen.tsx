@@ -1,3 +1,5 @@
+// Em: src/components/AccessibilityEnhancedMainScreen.tsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 
 import dataManager from '../core/DataManager';
@@ -32,14 +34,14 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
 
   const categories = dataManager.getCategories();
 
-  // O ROBÔ: Verifica transações automáticas ao iniciar
+  // O ROBÔ: Verifica transações automáticas ao iniciar e ao mudar de período
   useEffect(() => {
     if (typeof dataManager.processRecurringTransactions === 'function') {
        dataManager.processRecurringTransactions().then(() => {
          updateSummary();
        });
     }
-  }, []);
+  }, [currentPeriod]); // Adicionado currentPeriod para re-verificar ao navegar
 
   const updateSummary = useCallback(() => {
     const newSummary = dataManager.getFinancialSummary(currentPeriod);
@@ -92,42 +94,83 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
     };
   }, [updateSummary]);
 
-  // Função auxiliar para formatar a data apenas visualmente (DD/MM/AAAA)
+  // Função auxiliar para formatar a data visualmente (DD/MM/AAAA)
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '';
     try {
-      const date = new Date(dateString);
-      // Verifica se a data é válida
-      if (isNaN(date.getTime())) return dateString;
-      return date.toLocaleDateString('pt-BR');
+      // Como a data já vem YYYY-MM-DD do DataManager (string local),
+      // podemos apenas separar e remontar para evitar conversões de timezone do Date()
+      const [year, month, day] = dateString.split('-');
+      if (year && month && day) {
+        return `${day}/${month}/${year}`;
+      }
+      return dateString;
     } catch (e) {
       return dateString;
     }
   };
 
+  // ▼▼▼ FUNÇÃO PARA RENDERIZAR OS BADGES (∞ ou 1/10) ▼▼▼
+  const renderInstallmentBadge = (t: any) => {
+    // Caso 1: Assinatura Infinita
+    // (É recorrente E sem limite) OU (É filha de uma transação sem limite total)
+    const isInfinite = (t.isRecurring && !t.recurrenceLimit) || 
+                       (t.originalTransactionId && !t.installmentTotal && !t.isRecurring);
+
+    if (isInfinite) {
+        return (
+            <span className="inline-flex items-center justify-center bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2 border border-blue-200 dark:border-blue-700" title="Assinatura (Infinito)">
+               ∞
+            </span>
+        );
+    }
+
+    // Caso 2: Parcelamento (X/Y)
+    if (t.installmentTotal && t.installmentTotal > 0) {
+        return (
+            <span className="inline-flex items-center justify-center bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2 border border-purple-200 dark:border-purple-700">
+               {t.installmentNumber}/{t.installmentTotal}
+            </span>
+        );
+    }
+    return null;
+  };
+  // ▲▲▲▲▲▲
+
   const handleAddTransaction = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount) return;
     
-    // Prepara dados da recorrência
-    const day = isRecurring ? (parseInt(recurrenceDay) || new Date().getDate()) : undefined;
-    const limit = isRecurring && recurrenceLimit ? parseInt(recurrenceLimit) : undefined;
+    // --- LÓGICA DE DATA CORRIGIDA (SEM UTC) ---
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    
+    // Verifica se estamos visualizando o mês atual. 
+    // Se sim, usa o dia de hoje. Se não, usa o dia 01 do mês visualizado (para não sumir da lista).
+    const currentMonthKey = `${y}-${m}`;
+    const dayToUse = currentPeriod === currentMonthKey ? d : '01';
+    
+    // Formata YYYY-MM-DD localmente
+    const dateToSend = `${currentPeriod}-${dayToUse}`;
 
-    // Data atual completa (ISO) para salvar no banco
-    const transactionDate = new Date().toISOString();
+    // --- LÓGICA DE RECORRÊNCIA ---
+    // Se digitou dia, usa. Se não, usa o dia da data calculada.
+    const recDay = isRecurring && recurrenceDay ? parseInt(recurrenceDay) : parseInt(dayToUse);
+    // Se digitou limite, usa int. Se vazio, manda null (infinito).
+    const limit = isRecurring && recurrenceLimit ? parseInt(recurrenceLimit) : null;
 
     const transactionData = { 
         ...formData, 
-        date: transactionDate, 
+        date: dateToSend, 
         
         // Dados de Recorrência
         isRecurring,
-        recurrenceDay: day,
+        recurrenceDay: recDay,
         recurrenceLimit: limit,
-        recurrenceCurrent: 0,
-        
-        // Marcamos o mês atual como "já gerado" para esta transação manual
-        lastGeneratedMonth: isRecurring ? currentPeriod : null
+        // recurrenceCurrent e lastGeneratedMonth são tratados automaticamente no DataManager
+        // mas podemos passar explicitamente se necessário. O DataManager novo cuida disso.
     };
     
     const transaction = await dataManager.addTransaction(transactionData);
@@ -735,6 +778,7 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
                 </select>
               </div>
             </div>
+
 {/* ================================================= */}
 {/* ▼▼▼ SEÇÃO DE RECORRÊNCIA (CHECKBOX 25px) ▼▼▼ */}
 {/* ================================================= */}
@@ -960,16 +1004,14 @@ export const AccessibilityEnhancedMainScreen: React.FC<MainScreenProps> = ({ onN
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                             <p className="font-medium text-gray-800 dark:text-gray-100 break-words">{transaction.description}</p>
-                           {transaction.originalTransactionId && (
-                               <span title="Transação recorrente" className="text-gray-400">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                               </span>
-                           )}
+                            
+                            {/* ▼▼▼ NOVO BADGE (VISUALIZAÇÃO CORRIGIDA) ▼▼▼ */}
+                            {renderInstallmentBadge(transaction)}
+                            {/* ▲▲▲ FIM DO BADGE ▲▲▲ */}
+
                         </div>
                         <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {/* AQUI: Usamos a função auxiliar para mostrar a data LIMPA */}
+                          {/* Data formatada localmente */}
                           <span>{formatDateDisplay(transaction.date)}</span>
                           
                           <span className="mx-2">•</span>
