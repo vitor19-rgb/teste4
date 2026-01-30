@@ -1,5 +1,5 @@
 // Em: src/core/DataManager.ts
-// (Versão Corrigida: Erro Firebase undefined resolvido)
+// (Versão Corrigida: Erro Firebase undefined resolvido + Lógica do Último Dia)
 
 import {
   Auth,
@@ -196,7 +196,7 @@ class DataManager {
   }
 
   // =================================================================
-  // ROBÔ DE RECORRÊNCIA (CORRIGIDO)
+  // ROBÔ DE RECORRÊNCIA (CORRIGIDO COM LÓGICA DO ÚLTIMO DIA)
   // =================================================================
 
   async processRecurringTransactions() {
@@ -222,12 +222,19 @@ class DataManager {
         continue;
       }
 
-      // 3. Verificação do Dia
+      // 3. Verificação do Dia com ajuste para o último dia do mês
       const triggerDay = parent.recurrenceDay || 1;
       
-      if (currentDay >= triggerDay) {
+      // 4. Calcular o último dia do mês atual
+      // Criamos uma data no dia 0 do PRÓXIMO mês, o que nos retorna o último dia do mês atual
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      
+      // 5. Ajustar o dia: se o triggerDay for maior que o último dia do mês, usar o último dia
+      const adjustedDay = Math.min(triggerDay, lastDayOfMonth);
+      
+      if (currentDay >= adjustedDay) {
         // --- DATA MANUAL ---
-        const targetDate = new Date(today.getFullYear(), today.getMonth(), triggerDay);
+        const targetDate = new Date(today.getFullYear(), today.getMonth(), adjustedDay);
         const y = targetDate.getFullYear();
         const m = String(targetDate.getMonth() + 1).padStart(2, '0');
         const d = String(targetDate.getDate()).padStart(2, '0');
