@@ -15,19 +15,32 @@ interface Dream {
   monthlyAmount?: number;
   calculationType: 'date' | 'monthly';
   createdAt: string;
+  targetCurrency?: string; // NOVO: Campo para guardar a moeda de destino (ex: 'USD')
 }
+
+// Lista de moedas suportadas para facilitar no formulário
+const CURRENCIES = [
+  { code: 'USD', name: 'Dólar Americano' },
+  { code: 'EUR', name: 'Euro' },
+  { code: 'GBP', name: 'Libra Esterlina' },
+  { code: 'JPY', name: 'Iene Japonês' },
+  { code: 'CAD', name: 'Dólar Canadense' },
+  { code: 'AUD', name: 'Dólar Australiano' },
+];
 
 export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
   const [dreams, setDreams] = useState<Dream[]>([]); 
   const [showAddModal, setShowAddModal] = useState(false);
   
-  // Estados para o formulário de criação
+  // Estados para o formulário de criação atualizados
   const [formData, setFormData] = useState({
     name: '',
     totalValue: '',
     calculationType: 'date',
     targetDate: '',
-    monthlyAmount: ''
+    monthlyAmount: '',
+    isInternational: false, // NOVO: Controle se é viagem
+    targetCurrency: 'USD'   // NOVO: Moeda padrão
   });
   const [calculationResult, setCalculationResult] = useState<any>(null);
 
@@ -40,6 +53,10 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [infoDream, setInfoDream] = useState<Dream | null>(null);
   const [infoProjection, setInfoProjection] = useState<any>(null);
+  
+  // NOVO: Estados para a conversão de moeda
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,7 +69,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     setDreams(userDreams);
   };
 
-  // --- Função Auxiliar para Calcular Projeção em Tempo Real ---
   const calculateDreamProjection = (dream: Dream) => {
     const remaining = dream.totalValue - dream.savedAmount;
     if (remaining <= 0) return { type: 'completed' };
@@ -98,12 +114,40 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     return null;
   };
 
-  const openInfoModal = (e: React.MouseEvent, dream: Dream) => {
+  // NOVO: Função para formatar a moeda estrangeira
+  const formatForeignCurrency = (value: number, currencyCode: string) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currencyCode }).format(value);
+  };
+
+  // ATUALIZADO: Ao abrir o modal, verificamos se tem moeda estrangeira e chamamos a API
+  const openInfoModal = async (e: React.MouseEvent, dream: Dream) => {
     e.stopPropagation();
     const projection = calculateDreamProjection(dream);
     setInfoDream(dream);
     setInfoProjection(projection);
     setIsInfoModalOpen(true);
+    
+    // Reseta o estado da cotação
+    setExchangeRate(null);
+
+    // Se o sonho tiver uma moeda de destino, buscamos a cotação
+    if (dream.targetCurrency) {
+      setIsFetchingRate(true);
+      try {
+        // Chamada para a sua API ExchangeRate
+        const response = await fetch(`https://v6.exchangerate-api.com/v6/e62a26d919249617b1335821/latest/BRL`);
+        const data = await response.json();
+        
+        if (data.result === 'success' && data.conversion_rates[dream.targetCurrency]) {
+          // A API retorna quanto 1 BRL vale na moeda alvo (ex: 1 BRL = 0.20 USD)
+          setExchangeRate(data.conversion_rates[dream.targetCurrency]);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar cotação:", error);
+      } finally {
+        setIsFetchingRate(false);
+      }
+    }
   };
 
   const closeInfoModal = () => {
@@ -111,8 +155,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     setInfoDream(null);
     setInfoProjection(null);
   };
-
-  // --- Funções de Formulário ---
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +168,11 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
 
     if (formData.targetDate) dreamData.targetDate = formData.targetDate;
     if (formData.monthlyAmount) dreamData.monthlyAmount = parseFloat(formData.monthlyAmount);
+    
+    // NOVO: Salva a moeda se for viagem internacional
+    if (formData.isInternational) {
+      dreamData.targetCurrency = formData.targetCurrency;
+    }
 
     const newDream = await dataManager.addDream(dreamData);
 
@@ -171,7 +218,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
   };
 
   const resetFormData = () => {
-    setFormData({ name: '', totalValue: '', calculationType: 'date', targetDate: '', monthlyAmount: '' });
+    setFormData({ name: '', totalValue: '', calculationType: 'date', targetDate: '', monthlyAmount: '', isInternational: false, targetCurrency: 'USD' });
     setCalculationResult(null);
   };
 
@@ -209,7 +256,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
     }
   }, [formData]);
 
-  // --- Funções de Contribuição ---
   const openContributionModal = (dream: Dream) => {
     setSelectedDream(dream);
     setIsContributionModalOpen(true);
@@ -299,10 +345,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
               key={dream.id} 
               className="bg-white p-6 rounded-2xl shadow-sm border-2 border-transparent hover:border-purple-300 transition-all relative group"
             >
-              {/* --- GRUPO DE BOTÕES (INFO + LIXEIRA) --- */}
-              {/* Agora sem opacity-0: aparecem sempre! */}
               <div className="absolute top-3 right-3 flex gap-2">
-                {/* Botão Informação */}
                 <button 
                   onClick={(e) => openInfoModal(e, dream)}
                   className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 hover:scale-110 transition-all"
@@ -314,7 +357,6 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
                   </svg>
                 </button>
                 
-                {/* Botão Lixeira */}
                 <button 
                   onClick={(e) => handleDelete(e, dream.id)}
                   className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 hover:scale-110 transition-all"
@@ -327,8 +369,9 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
                 </button>
               </div>
 
-              {/* Título com espaço extra à direita (pr-16) para não tapar os botões */}
-              <h3 className="text-lg font-bold text-purple-900 mb-2 truncate pr-16">{dream.name}</h3>
+              <h3 className="text-lg font-bold text-purple-900 mb-2 truncate pr-16">
+                {dream.targetCurrency && "✈️ "} {dream.name}
+              </h3>
               <p className="text-sm text-slate-600">
                 Objetivo: <span className="font-semibold text-purple-700">{formatCurrency(dream.totalValue)}</span>
               </p>
@@ -356,7 +399,7 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
         })}
       </div>
 
-      {/* --- MODAL DE INFORMAÇÕES (COM LÓGICA DE CÁLCULO) --- */}
+      {/* --- MODAL DE INFORMAÇÕES --- */}
       {isInfoModalOpen && infoDream && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fade-in-scale"
@@ -391,6 +434,38 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
                   <span className="font-bold text-purple-600">{formatCurrency(infoDream.totalValue - infoDream.savedAmount)}</span>
                 </div>
               </div>
+
+              {/* NOVO: Bloco de Conversão de Moeda Estrangeira */}
+              {infoDream.targetCurrency && (
+                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                  <h4 className="text-sm font-bold text-yellow-800 mb-2 flex items-center gap-1">
+                    🌍 Câmbio e Conversão ({infoDream.targetCurrency})
+                  </h4>
+                  {isFetchingRate ? (
+                    <p className="text-sm text-yellow-600 animate-pulse">Buscando cotação ao vivo...</p>
+                  ) : exchangeRate ? (
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-yellow-700">Guardado (aprox.):</span>
+                        <span className="font-bold text-green-700">
+                          {formatForeignCurrency(infoDream.savedAmount * exchangeRate, infoDream.targetCurrency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-yellow-700">Objetivo (aprox.):</span>
+                        <span className="font-bold text-purple-700">
+                          {formatForeignCurrency(infoDream.totalValue * exchangeRate, infoDream.targetCurrency)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-yellow-600 mt-2 italic">
+                        *1 BRL = {exchangeRate.toFixed(4)} {infoDream.targetCurrency} hoje.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-red-500">Não foi possível carregar a cotação.</p>
+                  )}
+                </div>
+              )}
 
               {infoProjection ? (
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
@@ -466,6 +541,41 @@ export const DreamsScreen: React.FC<DreamsScreenProps> = ({ onNavigate }) => {
                   <input type="number" id="totalValue" value={formData.totalValue} onChange={(e) => setFormData({...formData, totalValue: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-xl" placeholder="Ex: 20000" required />
                 </div>
               </div>
+              
+              {/* NOVO: Bloco para viagem internacional */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center">
+                  <input 
+                    type="checkbox" 
+                    id="isInternational" 
+                    checked={formData.isInternational} 
+                    onChange={(e) => setFormData({...formData, isInternational: e.target.checked})} 
+                    className="h-4 w-4 text-purple-600 rounded border-slate-300" 
+                  />
+                  <label htmlFor="isInternational" className="ml-2 text-sm font-medium text-slate-700">
+                    É uma viagem internacional?
+                  </label>
+                </div>
+                
+                {formData.isInternational && (
+                  <div className="mt-3">
+                    <label htmlFor="targetCurrency" className="block text-sm font-medium text-slate-700 mb-1">Qual a moeda de destino?</label>
+                    <select 
+                      id="targetCurrency" 
+                      value={formData.targetCurrency} 
+                      onChange={(e) => setFormData({...formData, targetCurrency: e.target.value})} 
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
+                    >
+                      {CURRENCIES.map(curr => (
+                        <option key={curr.code} value={curr.code}>
+                          {curr.name} ({curr.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
               <fieldset>
                 <legend className="block text-sm font-medium text-slate-700 mb-2">Como deseja calcular?</legend>
                 <div className="flex gap-4">
