@@ -126,20 +126,11 @@ const App: React.FC = () => {
         <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
           <div className="text-center max-w-lg w-full">
             <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-6 sm:mb-8 shadow-2xl animate-pulse">
-              <svg
-                className="w-10 h-10 sm:w-12 sm:h-12 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.5"
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                ></path>
-              </svg>
+              <img 
+                  src="/icone.png" 
+                  alt="Logo OrçaMais" 
+                  className="w-full h-full object-contain"
+                />
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 sm:mb-6">
@@ -175,13 +166,13 @@ const App: React.FC = () => {
                     Desenvolvido por
                   </p>
                   <p className="text-lg sm:text-xl font-bold text-white">
-                    Vitor Rafael de Almeida
+                    Time OrçaMais
                   </p>
                 </div>
 
                 <div className="border-t border-white/20 pt-4">
                   <p className="text-sm text-blue-100 text-center mb-2">
-                    Projeto de TCC - FETEPS
+                    Projeto de finanças pessoais com foco em UX e acessibilidade
                   </p>
                   <div className="inline-flex items-center justify-center w-full">
                     <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">
