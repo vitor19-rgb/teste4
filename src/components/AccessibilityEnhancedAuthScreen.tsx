@@ -1,5 +1,4 @@
 // Em: src/components/AccessibilityEnhancedAuthScreen.tsx
-// (Esta é a tua versão atual, que já contém o "isLoading" e o "Esqueceu a Senha")
 
 /**
  * Accessibility Enhanced AuthScreen
@@ -10,6 +9,7 @@
  * - Adiciona o link "Esqueceu a senha?" (Passo 3).
  * - Integra login/cadastro com Firebase (Passo 4).
  * - CORREÇÃO: Recebe 'initialMode' para corrigir bug de navegação.
+ * - ATUALIZAÇÃO: Logótipo redimensionado (mais pequeno e subtil).
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,7 +23,7 @@ import {
 } from 'firebase/auth';
 
 
-// --- Interface de Props (Já inclui 'onNavigate' e 'initialMode') ---
+// --- Interface de Props ---
 interface AuthScreenProps {
   onAuthSuccess: (userData: any) => void;
   onNavigate: (screen: 'forgotPassword' | string) => void;
@@ -36,7 +36,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
   initialMode = 'login' 
 }) => {
 
-  // O estado 'isLoginMode' agora começa com base na prop
   const [isLoginMode, setIsLoginMode] = useState(initialMode === 'login');
   
   const [formData, setFormData] = useState({
@@ -50,8 +49,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
     password: ''
   });
   
-  // --- O ESTADO DE CARREGAMENTO QUE PROCURAVAS ---
-  // Este estado 'isLoading' já existe no teu código atual.
   const [isLoading, setIsLoading] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -119,7 +116,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    // --- AQUI COMEÇA O CARREGAMENTO ---
     setIsLoading(true); 
     
     if (isLoginMode) {
@@ -137,14 +133,12 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
         formData.password
       );
       
-      // Sucesso
-      setIsLoading(false); // <-- Termina o carregamento
+      setIsLoading(false);
       announceError('Login realizado com sucesso');
       onAuthSuccess(userCredential.user);
 
     } catch (error: any) {
-      // Erro
-      setIsLoading(false); // <-- Termina o carregamento
+      setIsLoading(false);
       let message = 'Erro ao fazer login.';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         message = 'Email ou senha inválidos.';
@@ -156,28 +150,24 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
 
   const handleRegister = async () => {
     try {
-      // 1. Criamos o usuário
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
         formData.email, 
         formData.password
       );
 
-      // 2. Atualizamos o perfil dele com o NOME
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, {
           displayName: formData.name
         });
       }
 
-      // Sucesso
-      setIsLoading(false); // <-- Termina o carregamento
+      setIsLoading(false);
       announceError('Conta criada com sucesso');
       onAuthSuccess({ ...userCredential.user, displayName: formData.name });
 
     } catch (error: any) {
-      // Erro
-      setIsLoading(false); // <-- Termina o carregamento
+      setIsLoading(false);
       let message = 'Erro ao criar conta.';
       if (error.code === 'auth/email-already-in-use') {
         message = 'Este email já está sendo usado.';
@@ -196,10 +186,9 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
     announceError(isLoginMode ? 'Modo de cadastro ativado' : 'Modo de login ativado');
   };
 
-  // --- O JSX (Layout) ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
-      {/* (O teu layout e ícones originais estão todos aqui...) */}
+      {/* Background e Efeitos */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
       <div className="absolute top-20 left-10 w-20 h-20 bg-blue-400/20 rounded-full blur-xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-32 h-32 bg-indigo-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
@@ -209,18 +198,16 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
           <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/20">
             {/* Header */}
             <header className="text-center mb-6 sm:mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-4 sm:mb-6 shadow-xl">
-                {/* O Teu Ícone Original */}
-                <svg 
-                  className="w-8 h-8 sm:w-10 sm:h-10 text-white" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                </svg>
+              
+              {/* Logótipo Customizado do OrçaMais (Tamanho Reduzido) */}
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-300">
+                <img 
+                  src="/icone.png" 
+                  alt="Logo OrçaMais" 
+                  className="w-full h-full object-contain"
+                />
               </div>
+
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                 {isLoginMode ? 'Acesso à Plataforma' : 'Criar Conta Profissional'}
               </h1>
@@ -238,7 +225,6 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                 noValidate
                 aria-label={isLoginMode ? 'Formulário de login' : 'Formulário de cadastro'}
               >
-                {/* Nome (apenas no cadastro) */}
                 {!isLoginMode && (
                   <div className="space-y-2">
                     <label 
@@ -363,7 +349,7 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                   )}
                 </div>
 
-                {/* Link "Esqueceu a senha?" (JÁ INCLUÍDO) */}
+                {/* Link "Esqueceu a senha?" */}
                 {isLoginMode && (
                   <div className="text-right text-sm">
                     <button
@@ -378,15 +364,14 @@ export const AccessibilityEnhancedAuthScreen: React.FC<AuthScreenProps> = ({
                 )}
 
 
-                {/* Botão Submit (COM O LOADING) */}
+                {/* Botão Submit */}
                 <button
                   type="submit"
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] transform disabled:opacity-75 disabled:scale-100"
                   aria-describedby="submit-help"
                   disabled={isLoading}
                 >
-                  {/* Este é o texto de carregamento que tu procuravas */}
-                  {isLoading ? 'Carregando...' : (isLoginMode ? 'Acessar Plataforma' : 'Criar Conta Profissional')}
+                  {isLoading ? 'A Carregar...' : (isLoginMode ? 'Acessar Plataforma' : 'Criar Conta Profissional')}
                 </button>
                 <div id="submit-help" className="sr-only">
                   {isLoginMode ? 'Clique para fazer login' : 'Clique para criar sua conta'}
