@@ -9,6 +9,8 @@
  * - Se não existir, pede para criar conta (como tu querias).
  * - 🚨 IMPORTANTE: Isto SÓ FUNCIONA se a "Proteção contra enumeração de emails"
  * estiver DESATIVADA no painel do Firebase.
+ * * ATUALIZAÇÃO VISUAL:
+ * - Ícone genérico substituído pelo logótipo oficial do OrçaMais (mesmo tamanho da tela de Login).
  */
 
 import React, { useState } from 'react';
@@ -75,7 +77,6 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
   };
 
   return (
-    // O teu JSX original, 100% mantido
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
@@ -90,17 +91,16 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
             
             {/* Header */}
             <header className="text-center mb-6 sm:mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-4 sm:mb-6 shadow-xl">
-                <svg 
-                  className="w-8 h-8 sm:w-10 sm:h-10 text-white" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6.4 4.5c-1.2 0-2.3-.5-3.1-1.3-1.8-1.8-1.8-4.6 0-6.4 1-1 2.3-1.3 3.5-1.1m6 0c1.2.2 2.5-.1 3.5-1.1 1.8-1.8 1.8-4.6 0-6.4-.8-.8-1.9-1.3-3.1-1.3-1.2 0-2.3.5-3.1 1.3-1.8 1.8-1.8 4.6 0 6.4.8.8 1.9 1.3 3.1 1.3z"></path>
-                </svg>
+              
+              {/* Logótipo Customizado do OrçaMais (Tamanho Reduzido) */}
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-300">
+                <img 
+                  src="/icone.png" 
+                  alt="Logo OrçaMais" 
+                  className="w-full h-full object-contain"
+                />
               </div>
+
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                 Redefinir Senha
               </h1>
@@ -155,7 +155,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ onNa
                         {error}
                       </div>
 
-                      {/* Botão Criar Conta (AGORA VAI FUNCIONAR) */}
+                      {/* Botão Criar Conta */}
                       {error.includes('Deseja criar uma conta?') && (
                         <button
                           type="button"
